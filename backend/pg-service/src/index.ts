@@ -1,1 +1,19 @@
-import express from "express"; const app = express(); app.listen(process.env.PORT, () => console.log("PG Service is running"));
+import express from 'express';
+import postRoutes from './postRoutes.js';
+import { errorHandler } from './errorHandler.js';
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+// Middleware do parsowania JSON
+app.use(express.json());
+
+// Rejestracja routerów
+app.use('/api/posts', postRoutes);
+
+// Rejestracja globalnego handlera błędów
+app.use(errorHandler);
+
+app.listen(PORT, () => {
+  console.log(`PG Service działa na porcie ${PORT}`);
+});
