@@ -26,12 +26,20 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       include: { author: { select: { username: true } } } 
     });
 
+    // Pobieranie ID obserwujących (Wymóg T19 - do fan-outu)
+    const followers = await prisma.follow.findMany({
+      where: { followeeId: authorId },
+      select: { followerId: true }
+    });
+    const followerIds = followers.map(f => f.followerId);
+
     // Próba zapisu "Rich" danych do MongoDB przez HTTP
     const mongoPayload = {
       postId: createdPost.id,
       authorId: createdPost.authorId,
       attachments: attachments || [],
-      poll: poll || undefined
+      poll: poll || undefined,
+      followerIds // Przekazujemy listę obserwujących do operacji fan-outu w Mongo
     };
 
     const mongoResponse = await fetch(`${MONGO_SERVICE_URL}/api/internal/rich-posts`, {
