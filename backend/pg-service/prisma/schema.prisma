@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  email     String   @unique
+  createdAt DateTime @default(now())
+
+  posts     Post[]
+  comments  Comment[]
+  reactions Reaction[]
+
+  followers Follow[] @relation("UserFollowers")
+  following Follow[] @relation("UserFollowing")
+}
+
+model Follow {
+  id         Int      @id @default(autoincrement())
+  followerId Int
+  followeeId Int
+  createdAt  DateTime @default(now())
+
+  follower   User     @relation("UserFollowing", fields: [followerId], references: [id])
+  followee   User     @relation("UserFollowers", fields: [followeeId], references: [id])
+
+  @@unique([followerId, followeeId])
+}
+
+model Post {
+  id          Int      @id @default(autoincrement())
+  authorId    Int
+  bodyPreview String   @db.VarChar(255)
+  createdAt   DateTime @default(now())
+
+  author      User     @relation(fields: [authorId], references: [id])
+  comments    Comment[]
+  reactions   Reaction[]
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  authorId  Int
+  parentId  Int?
+  content   String
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id])
+  author    User     @relation(fields: [authorId], references: [id])
+  parent    Comment? @relation("CommentThread", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentThread")
+}
+
+model Reaction {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  userId    Int
+  type      String
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([postId, userId])
+}
