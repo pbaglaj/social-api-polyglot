@@ -11,6 +11,6 @@ app.use(express.json());
 
 connectDB().then(() => {
   app.listen(PORT, () => {
-    console.log(`🚀 Mongo Service działa na porcie ${PORT}`);
+    console.log(`Mongo Service działa na porcie ${PORT}`);
   });
 });
