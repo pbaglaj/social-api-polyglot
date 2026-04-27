@@ -12,7 +12,7 @@ const UserFeedEntrySchema = new Schema<IUserFeedEntry>({
   userId: { type: Number, required: true, index: true },
   postId: { type: Number, required: true },
   score: { type: Number, default: 1 },
-  insertedAt: { type: Date, default: Date.now }
+  insertedAt: { type: Date, default: Date.now, index: true }
 });
 
 export const UserFeedEntry = mongoose.model<IUserFeedEntry>('UserFeedEntry', UserFeedEntrySchema);
