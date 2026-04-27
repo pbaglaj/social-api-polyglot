@@ -5,16 +5,25 @@ import { PrismaClient } from '@prisma/client';
 const router = Router();
 const prisma = new PrismaClient();
 
+router.get('/', async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+  try {
+    const users = await prisma.user.findMany();
+    return res.status(200).json({ success: true, users });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Wymóg T17 i T18: Follow / Unfollow z blokadą self-follow
 router.post('/:id/follow', async (req: Request, res: Response, next: NextFunction): Promise<any> => {
   const followeeParam = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   if (!followeeParam) {
-    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_FOLLOWEE_ID', details: 'Brak id użytkownika.' });
+    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_FOLLOWEE_ID', details: 'No followee ID provided.' });
   }
 
   const followeeId = parseInt(followeeParam, 10);
   if (Number.isNaN(followeeId)) {
-    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_FOLLOWEE_ID', details: 'Nieprawidłowe id użytkownika.' });
+    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_FOLLOWEE_ID', details: 'Invalid followee ID.' });
   }
 
   const { followerId } = req.body; // W prawdziwej aplikacji to ID pochodziłoby z tokena JWT
@@ -24,7 +33,7 @@ router.post('/:id/follow', async (req: Request, res: Response, next: NextFunctio
     return res.status(400).json({ 
       error: 'Validation Error', 
       code: 'SELF_FOLLOW', 
-      details: 'Nie można obserwować samego siebie.' 
+      details: 'Cannot follow yourself.' 
     });
   }
 
@@ -42,12 +51,12 @@ router.post('/:id/follow', async (req: Request, res: Response, next: NextFunctio
 router.delete('/:id/follow', async (req: Request, res: Response, next: NextFunction): Promise<any> => {
   const followeeParam = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   if (!followeeParam) {
-    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_FOLLOWEE_ID', details: 'Brak id użytkownika.' });
+    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_FOLLOWEE_ID', details: 'No followee ID provided.' });
   }
 
   const followeeId = parseInt(followeeParam, 10);
   if (Number.isNaN(followeeId)) {
-    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_FOLLOWEE_ID', details: 'Nieprawidłowe id użytkownika.' });
+    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_FOLLOWEE_ID', details: 'Invalid followee ID.' });
   }
 
   const { followerId } = req.body;
