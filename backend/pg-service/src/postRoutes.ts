@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import e, { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 
@@ -31,7 +31,9 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       where: { followeeId: authorId },
       select: { followerId: true }
     });
-    const followerIds = followers.map(f => f.followerId);
+    const followerIds = (followers as Array<{ followerId: number }>).map(
+      (f: { followerId: number }) => f.followerId
+    );
 
     // Próba zapisu "Rich" danych do MongoDB przez HTTP
     const mongoPayload = {
@@ -59,7 +61,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     // KOMPENSACJA (Rollback w architekturze rozproszonej - Wymóg T10)
     if (createdPost) {
       console.warn(`[Kompensacja] Usuwanie posta ${createdPost.id} z PG z powodu błędu Mongo...`);
-      await prisma.post.delete({ where: { id: createdPost.id } }).catch(e => 
+      await prisma.post.delete({ where: { id: createdPost.id } }).catch((e: unknown): void => 
         console.error('Krytyczny błąd kompensacji!', e)
       );
     }

@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { Prisma } from '@prisma/client';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 export const errorHandler = (err: any, req: Request, res: Response, next: NextFunction) => {
   console.error('Błąd:', err);
@@ -13,7 +13,7 @@ export const errorHandler = (err: any, req: Request, res: Response, next: NextFu
   };
 
   // Mapowanie błędów Prisma (PostgreSQL) - Wymóg T1
-  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+  if (err instanceof PrismaClientKnownRequestError) {
     if (err.code === 'P2002') { // Naruszenie unikalności (np. PG 23505)
       status = 409;
       response = { error: 'Conflict', code: 'P2002', details: `Unikalność naruszona dla pól: ${err.meta?.target}` };
