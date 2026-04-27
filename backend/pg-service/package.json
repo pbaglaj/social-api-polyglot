@@ -4,6 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "node app.js",
+    "prisma:generate": "prisma generate",
+    "migrate": "prisma migrate dev",
+    "seed": "prisma db seed",
+    "seed:test": "cross-env NODE_ENV=test node prisma/seed.test.js",
+    "db:reset": "prisma migrate reset --force --skip-seed && npm run seed",
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc"
   },
