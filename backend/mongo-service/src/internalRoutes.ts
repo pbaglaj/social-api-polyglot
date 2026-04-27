@@ -32,4 +32,26 @@ router.post('/rich-posts', async (req: Request, res: Response): Promise<any> => 
   }
 });
 
+// Wymóg T18: Kaskadowe usuwanie wpisów z feedu i rich posts
+router.delete('/rich-posts/:postId', async (req: Request, res: Response): Promise<any> => {
+  const postIdParam = Array.isArray(req.params.postId) ? req.params.postId[0] : req.params.postId;
+  if (!postIdParam) {
+    return res.status(400).json({ error: 'Brak postId' });
+  }
+
+  const postId = parseInt(postIdParam, 10);
+  if (Number.isNaN(postId)) {
+    return res.status(400).json({ error: 'Nieprawidłowe postId' });
+  }
+
+  try {
+    await RichPost.deleteOne({ postId });
+    await UserFeedEntry.deleteMany({ postId }); // Wyczyszczenie feedu ze śmieci
+    return res.status(204).send();
+  } catch (error) {
+    console.error('Błąd kaskadowego usuwania w Mongo:', error);
+    return res.status(500).json({ error: 'Błąd usunięcia' });
+  }
+});
+
 export default router;

@@ -71,4 +71,73 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+// [...] (tutaj jest Twój dotychczasowy router.post('/'))
+
+// Wymóg T17: Pobieranie postów z filtrem (np. po ID autora)
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
+  const authorId = req.query.authorId ? parseInt(req.query.authorId as string, 10) : undefined;
+  // Wymóg T4: Użycie surowego SQL ($queryRaw) jako alternatywy dla zaawansowanych filtrów
+  try {
+    if (authorId) {
+      // Dynamiczne zapytanie raw (Wymóg T2: bez sklejania stringów, bezpieczne parametryzowanie $1)
+      const posts = await prisma.$queryRaw`SELECT * FROM "Post" WHERE "authorId" = ${authorId} ORDER BY "createdAt" DESC`;
+      return res.json(posts);
+    }
+    
+    // Zwykłe zapytanie Prisma
+    const posts = await prisma.post.findMany({ orderBy: { createdAt: 'desc' } });
+    res.json(posts);
+  } catch (error) { next(error); }
+});
+
+// Wymóg T17: Idempotentne dodawanie reakcji
+router.post('/:id/reactions', async (req: Request, res: Response, next: NextFunction) => {
+  const idParam = req.params.id;
+
+  if (typeof idParam !== 'string') {
+    return res.status(400).json({ error: 'Invalid ID format' });
+  }
+
+  const postId = parseInt(idParam, 10);
+  if (isNaN(postId)) {
+    return res.status(400).json({ error: 'ID must be a valid number' });
+  }
+
+  const { userId, type } = req.body;
+
+  try {
+    // upsert gwarantuje idempotentność - jeśli istnieje, zaktualizuje, jeśli nie - stworzy.
+    const reaction = await prisma.reaction.upsert({
+      where: { postId_userId: { postId, userId } },
+      update: { type },
+      create: { postId, userId, type }
+    });
+    res.json(reaction);
+  } catch (error) { next(error); }
+});
+
+// Wymóg T18: Usunięcie postu + usunięcie kaskadowe z Mongo (sygnał HTTP)
+router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
+  const idParam = req.params.id;
+
+  if (typeof idParam !== 'string') {
+    return res.status(400).json({ error: 'Invalid ID format' });
+  }
+
+  const postId = parseInt(idParam, 10);
+  if (isNaN(postId)) {
+    return res.status(400).json({ error: 'ID must be a valid number' });
+  }
+
+  try {
+    await prisma.post.delete({ where: { id: postId } });
+    
+    // "Job" do usunięcia z feedu - wysyłamy żądanie w tle, nie blokujemy odpowiedzi (fire and forget)
+    fetch(`${MONGO_SERVICE_URL}/api/internal/rich-posts/${postId}`, { method: 'DELETE' })
+      .catch(err => console.error(`Błąd usuwania wpisów feedu dla posta ${postId}:`, err));
+
+    res.status(204).send();
+  } catch (error) { next(error); }
+});
+
 export default router;
