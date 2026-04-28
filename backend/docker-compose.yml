@@ -39,7 +39,7 @@ services:
       postgres:
         condition: service_healthy
     # T9: Migracje i seedy z compose, odpalane przed startem aplikacji
-    command: sh -c "npx prisma migrate deploy && npx prisma db seed && node dist/index.js"
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed && node dist/src/index.js"
 
   mongo-service:
     build:

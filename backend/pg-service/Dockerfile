@@ -20,4 +20,4 @@ COPY --from=builder /app/prisma ./prisma
 # Prisma wymaga klienta w środowisku produkcyjnym
 RUN npx prisma generate 
 
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/src/index.js"]
