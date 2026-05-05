@@ -1,9 +1,8 @@
 import  { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from './db.js';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Adres serwisu Mongo (wewnątrz sieci Docker)
 const MONGO_SERVICE_URL = 'http://mongo-service:3002';
@@ -130,8 +129,14 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
   }
 
   try {
-    await prisma.post.delete({ where: { id: postId } });
-    
+    // Najpierw usuń zależne rekordy (komentarze, reakcje), potem post.
+    // Używamy sekwencyjnej transakcji (callback), żeby zagwarantować kolejność operacji.
+    await prisma.$transaction(async (tx) => {
+      await tx.comment.deleteMany({ where: { postId } });
+      await tx.reaction.deleteMany({ where: { postId } });
+      await tx.post.delete({ where: { id: postId } });
+    });
+
     // "Job" do usunięcia z feedu - wysyłamy żądanie w tle, nie blokujemy odpowiedzi (fire and forget)
     fetch(`${MONGO_SERVICE_URL}/api/internal/rich-posts/${postId}`, { method: 'DELETE' })
       .catch(err => console.error(`Błąd usuwania wpisów feedu dla posta ${postId}:`, err));

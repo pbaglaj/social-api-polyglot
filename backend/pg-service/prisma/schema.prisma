@@ -52,7 +52,7 @@ model Comment {
   content   String
   createdAt DateTime @default(now())
 
-  post      Post     @relation(fields: [postId], references: [id])
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
   author    User     @relation(fields: [authorId], references: [id])
   parent    Comment? @relation("CommentThread", fields: [parentId], references: [id])
   replies   Comment[] @relation("CommentThread")
@@ -65,7 +65,7 @@ model Reaction {
   type      String
   createdAt DateTime @default(now())
 
-  post      Post     @relation(fields: [postId], references: [id])
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id])
 
   @@unique([postId, userId])

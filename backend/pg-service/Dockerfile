@@ -17,6 +17,8 @@ COPY package*.json ./
 RUN npm ci --only=production
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/src ./src
+COPY tsconfig.json ./
 # Prisma wymaga klienta w środowisku produkcyjnym
 RUN npx prisma generate 
 
