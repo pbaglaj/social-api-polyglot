@@ -7,7 +7,7 @@ const prismaClientSingleton = () => {
     throw new Error(`Brak zmiennej środowiskowej bazy danych`);
   }
 
-  return new PrismaClient({
+  const base = new PrismaClient({
     datasources: {
       db: {
         url: datasourceUrl,
@@ -17,6 +17,31 @@ const prismaClientSingleton = () => {
       ? ['query', 'info', 'warn', 'error']
       : ['warn', 'error'],
   });
+
+  // Client Extension: domain hook for user.create
+  const extended = base.$extends({
+    query: {
+      user: {
+        async create({ args, query }: any) {
+          try {
+            if (args && args.data && args.data.email) {
+              args.data.email = String(args.data.email).toLowerCase();
+            }
+
+            if (args && args.data && args.data.username) {
+              console.log(`[Hook] Przygotowuję do zapisu usera: ${args.data.username}`);
+            }
+          } catch (e) {
+            console.warn('[Prisma hook] error normalizing user.create args', e);
+          }
+
+          return query(args);
+        },
+      },
+    },
+  });
+
+  return extended;
 };
 
 type PrismaClientSingleton = ReturnType<typeof prismaClientSingleton>;
