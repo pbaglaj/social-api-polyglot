@@ -15,4 +15,7 @@ const UserFeedEntrySchema = new Schema<IUserFeedEntry>({
   insertedAt: { type: Date, default: Date.now, index: true }
 });
 
+// Indeks zlozony pod paginacje feedu (userId + insertedAt)
+UserFeedEntrySchema.index({ userId: 1, insertedAt: -1 });
+
 export const UserFeedEntry = mongoose.model<IUserFeedEntry>('UserFeedEntry', UserFeedEntrySchema);
