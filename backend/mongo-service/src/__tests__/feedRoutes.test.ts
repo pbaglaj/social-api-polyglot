@@ -22,7 +22,9 @@ test('GET /api/feed/:userId returns feed data', async (t) => {
   t.mock.method(UserFeedEntry, 'find', () => ({
     sort: () => ({
       limit: () => ({
-        lean: async () => mockFeed
+        populate: () => ({
+          lean: async () => mockFeed
+        })
       })
     })
   }));

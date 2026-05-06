@@ -26,9 +26,14 @@ router.post('/rich-posts', async (req: Request, res: Response): Promise<any> => 
 
     return res.status(201).json({ success: true, message: 'RichPost i Feed utworzone.' });
   } catch (error) {
-    console.error('Błąd zapisu w Mongo:', error);
+    console.error('Blad zapisu w Mongo:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
     // W przypadku błędu zwracamy 500, co wyzwoli kompensację w PostgreSQL
-    return res.status(500).json({ error: 'Błąd wewnętrzny bazy MongoDB', details: error });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      code: 'MONGO_WRITE_FAILED',
+      details: message
+    });
   }
 });
 
@@ -36,12 +41,20 @@ router.post('/rich-posts', async (req: Request, res: Response): Promise<any> => 
 router.delete('/rich-posts/:postId', async (req: Request, res: Response): Promise<any> => {
   const postIdParam = Array.isArray(req.params.postId) ? req.params.postId[0] : req.params.postId;
   if (!postIdParam) {
-    return res.status(400).json({ error: 'Brak postId' });
+    return res.status(400).json({
+      error: 'Validation Error',
+      code: 'MISSING_POST_ID',
+      details: 'Brak postId.'
+    });
   }
 
   const postId = parseInt(postIdParam, 10);
   if (Number.isNaN(postId)) {
-    return res.status(400).json({ error: 'Nieprawidłowe postId' });
+    return res.status(400).json({
+      error: 'Validation Error',
+      code: 'INVALID_POST_ID',
+      details: 'Nieprawidlowy postId.'
+    });
   }
 
   try {
@@ -49,8 +62,13 @@ router.delete('/rich-posts/:postId', async (req: Request, res: Response): Promis
     await UserFeedEntry.deleteMany({ postId }); // Wyczyszczenie feedu ze śmieci
     return res.status(204).send();
   } catch (error) {
-    console.error('Błąd kaskadowego usuwania w Mongo:', error);
-    return res.status(500).json({ error: 'Błąd usunięcia' });
+    console.error('Blad kaskadowego usuwania w Mongo:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      code: 'MONGO_DELETE_FAILED',
+      details: message
+    });
   }
 });
 

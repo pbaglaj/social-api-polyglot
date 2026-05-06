@@ -59,7 +59,12 @@ router.get('/trending', async (req: Request, res: Response): Promise<any> => {
     
     return res.json({ trending: trendingPosts });
   } catch (error) {
-    return res.status(500).json({ error: 'Błąd generowania analityki', details: error });
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      code: 'ANALYTICS_FAILED',
+      details: message
+    });
   }
 });
 

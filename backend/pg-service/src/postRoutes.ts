@@ -92,12 +92,20 @@ router.post('/:id/reactions', async (req: Request, res: Response, next: NextFunc
   const idParam = req.params.id;
 
   if (typeof idParam !== 'string') {
-    return res.status(400).json({ error: 'Invalid ID format' });
+    return res.status(400).json({
+      error: 'Validation Error',
+      code: 'INVALID_POST_ID',
+      details: 'Invalid post ID format.'
+    });
   }
 
   const postId = parseInt(idParam, 10);
   if (isNaN(postId)) {
-    return res.status(400).json({ error: 'ID must be a valid number' });
+    return res.status(400).json({
+      error: 'Validation Error',
+      code: 'INVALID_POST_ID',
+      details: 'Post ID must be a valid number.'
+    });
   }
 
   const { userId, type } = req.body;
@@ -118,12 +126,20 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
   const idParam = req.params.id;
 
   if (typeof idParam !== 'string') {
-    return res.status(400).json({ error: 'Invalid ID format' });
+    return res.status(400).json({
+      error: 'Validation Error',
+      code: 'INVALID_POST_ID',
+      details: 'Invalid post ID format.'
+    });
   }
 
   const postId = parseInt(idParam, 10);
   if (isNaN(postId)) {
-    return res.status(400).json({ error: 'ID must be a valid number' });
+    return res.status(400).json({
+      error: 'Validation Error',
+      code: 'INVALID_POST_ID',
+      details: 'Post ID must be a valid number.'
+    });
   }
 
   try {
