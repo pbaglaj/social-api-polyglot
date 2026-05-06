@@ -2,15 +2,26 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { RichPost } from './models/RichPost.js';
 import { UserFeedEntry } from './models/UserFeedEntry.js';
+import { ActivityDaily } from './models/ActivityDaily.js';
 
 const router = Router();
 
 router.post('/rich-posts', async (req: Request, res: Response): Promise<any> => {
-  const { postId, attachments, poll, followerIds } = req.body;
+  const { postId, authorId, attachments, poll, followerIds } = req.body;
 
   try {
     // Zapis rozszerzonych danych posta (Wymóg T16)
-    await RichPost.create({ postId, attachments, poll });
+    await RichPost.create({ postId, authorId, attachments, poll });
+
+    // Agregacja dzienna aktywnosci autora (activity_daily)
+    const day = new Date();
+    day.setUTCHours(0, 0, 0, 0);
+
+    await ActivityDaily.updateOne(
+      { day, authorId },
+      { $inc: { postsCreated: 1 }, $set: { updatedAt: new Date() } },
+      { upsert: true }
+    );
 
     // Operacja FAN-OUT (Wymóg T19) - "Rozsiewanie" wpisów do obserwujących
     if (followerIds && Array.isArray(followerIds) && followerIds.length > 0) {

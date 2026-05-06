@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { PipelineStage } from 'mongoose';
 import { UserFeedEntry } from './models/UserFeedEntry.js';
+import { ActivityDaily } from './models/ActivityDaily.js';
 
 const router = Router();
 
@@ -63,6 +64,68 @@ router.get('/trending', async (req: Request, res: Response): Promise<any> => {
     return res.status(500).json({
       error: 'Internal Server Error',
       code: 'ANALYTICS_FAILED',
+      details: message
+    });
+  }
+});
+
+router.get('/top-authors-weekly', async (req: Request, res: Response): Promise<any> => {
+  try {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    sevenDaysAgo.setUTCHours(0, 0, 0, 0);
+
+    const pipeline: PipelineStage[] = [
+      // 1. $match po indeksie (day)
+      {
+        $match: {
+          day: { $gte: sevenDaysAgo }
+        }
+      },
+      // 2. $group po autorze
+      {
+        $group: {
+          _id: '$authorId',
+          totalPosts: { $sum: '$postsCreated' }
+        }
+      },
+      // 3. dodatkowy stage - sortowanie
+      {
+        $sort: { totalPosts: -1 as const }
+      },
+      {
+        $limit: 10
+      },
+      // 4. $lookup - powiazanie z rich_posts (pokaz przykladowe dane)
+      {
+        $lookup: {
+          from: 'richposts',
+          localField: '_id',
+          foreignField: 'authorId',
+          as: 'posts'
+        }
+      },
+      // 5. $project - ksztalt odpowiedzi
+      {
+        $project: {
+          _id: 0,
+          authorId: '$_id',
+          totalPosts: 1,
+          samplePostId: { $arrayElemAt: ['$posts.postId', 0] },
+          attachmentsCount: {
+            $size: { $ifNull: [{ $arrayElemAt: ['$posts.attachments', 0] }, []] }
+          }
+        }
+      }
+    ];
+
+    const topAuthors = await ActivityDaily.aggregate(pipeline);
+    return res.json({ topAuthors });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      code: 'TOP_AUTHORS_FAILED',
       details: message
     });
   }

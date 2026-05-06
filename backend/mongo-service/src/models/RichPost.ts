@@ -13,6 +13,7 @@ const AttachmentSchema = new Schema<IAttachment>({
 
 export interface IRichPost extends Document {
   postId: number; // Referencja do ID z PostgreSQL
+  authorId: number;
   attachments: IAttachment[];
   poll?: { question: string; options: string[] };
   updatedAt: Date;
@@ -24,6 +25,7 @@ interface RichPostModel extends Model<IRichPost> {
 
 const RichPostSchema = new Schema<IRichPost, RichPostModel>({
   postId: { type: Number, required: true, unique: true },
+  authorId: { type: Number, required: true, index: true },
   attachments: {
     type: [AttachmentSchema],
     validate: {
@@ -52,6 +54,6 @@ RichPostSchema.statics.findByPostId = function(postId: number) {
 };
 
 // Indeks ułatwiający szybkie wyszukiwanie
-// RichPostSchema.index({ postId: 1 });
+RichPostSchema.index({ postId: 1 });
 
 export const RichPost = mongoose.model<IRichPost, RichPostModel>('RichPost', RichPostSchema);
