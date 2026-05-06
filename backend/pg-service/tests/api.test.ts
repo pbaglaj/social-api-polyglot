@@ -1,9 +1,10 @@
-import { describe, it, expect, jest } from '@jest/globals';
+import { beforeAll, afterAll, describe, it, expect, jest } from '@jest/globals';
 import request from 'supertest';
 import express from 'express';
 import postRoutes from '../src/postRoutes';
 import userRoutes from '../src/userRoutes';
 import { errorHandler } from '../src/errorHandler';
+import prisma from '../src/db';
 
 // Konfiguracja testowej aplikacji Express
 const app = express();
@@ -118,4 +119,110 @@ describe('PostgreSQL Error Code Mapping Tests', () => {
     expect(res.body.code).toBe('08006');
   });
 
+});
+
+describe('GET /api/users - Filtrowanie z dynamicznym WHERE', () => {
+  // Zastępujemy rzeczywiste wywołania Prisma lekkojszymi stubami,
+  // żeby testy mogły działać bez uruchomionego serwera PostgreSQL.
+  const usersStore: Array<any> = [];
+
+  beforeAll(() => {
+    usersStore.length = 0;
+    usersStore.push(
+      { id: 1, username: 'JanKowalski', email: 'jan.kowalski@example.com', createdAt: new Date() },
+      { id: 2, username: 'AnnaNowak', email: 'anna@test.pl', createdAt: new Date() },
+      { id: 3, username: 'Tomasz_Jan', email: 'tomek@example.com', createdAt: new Date() },
+    );
+
+    jest.spyOn(prisma.user, 'deleteMany').mockImplementation(async () => {
+      usersStore.length = 0;
+      return { count: 0 } as any;
+    });
+
+    jest.spyOn(prisma.user, 'createMany').mockImplementation(async ({ data }: any) => {
+      data.forEach((d: any) => usersStore.push({ id: usersStore.length + 1, ...d, createdAt: new Date() }));
+      return { count: data.length } as any;
+    });
+
+    jest.spyOn(prisma.user, 'findMany').mockImplementation(async (args?: any) => {
+      // Brak filtrów -> zwracamy wszystkie, posortowane malejąco po createdAt
+      if (!args || !args.where || Object.keys(args.where).length === 0) {
+        return usersStore.slice().sort((a, b) => +b.createdAt - +a.createdAt);
+      }
+
+      const where = args.where;
+      return usersStore.filter((u) => {
+        let ok = true;
+        if (where.username && where.username.contains) {
+          const needle = String(where.username.contains).toLowerCase();
+          ok = ok && u.username.toLowerCase().includes(needle);
+        }
+        if (where.email && where.email.contains) {
+          const needle = String(where.email.contains);
+          ok = ok && u.email.includes(needle);
+        }
+        return ok;
+      });
+    });
+
+    jest.spyOn(prisma, '$disconnect').mockResolvedValue(undefined as any);
+  });
+
+  afterAll(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('powinien zwrócić wszystkich użytkowników, gdy brak parametrów', async () => {
+    const response = await request(app).get('/api/users');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.users).toHaveLength(3);
+  });
+
+  it('powinien filtrować po nazwie użytkownika (częściowe dopasowanie, ignoruje wielkość liter)', async () => {
+    const response = await request(app).get('/api/users?username=jan');
+
+    expect(response.status).toBe(200);
+    expect(response.body.users).toHaveLength(2);
+
+    const usernames = response.body.users.map((u: any) => u.username);
+    expect(usernames).toContain('JanKowalski');
+    expect(usernames).toContain('Tomasz_Jan');
+  });
+
+  it('powinien filtrować po emailu (częściowe dopasowanie)', async () => {
+    const response = await request(app).get('/api/users?email=@example.com');
+
+    expect(response.status).toBe(200);
+    expect(response.body.users).toHaveLength(2);
+
+    const emails = response.body.users.map((u: any) => u.email);
+    expect(emails).toContain('jan.kowalski@example.com');
+    expect(emails).toContain('tomek@example.com');
+  });
+
+  it('powinien łączyć parametry username i email', async () => {
+    const response = await request(app).get('/api/users?username=jan&email=@example.com');
+
+    expect(response.status).toBe(200);
+    expect(response.body.users).toHaveLength(1);
+    expect(response.body.users[0].username).toBe('JanKowalski');
+  });
+
+  it('powinien usunąć białe znaki z parametrów (trim)', async () => {
+    const response = await request(app).get('/api/users?username=  AnnaNowak  ');
+
+    expect(response.status).toBe(200);
+    expect(response.body.users).toHaveLength(1);
+    expect(response.body.users[0].username).toBe('AnnaNowak');
+  });
+
+  it('powinien zwrócić pustą tablicę, gdy nikt nie pasuje', async () => {
+    const response = await request(app).get('/api/users?username=NieistniejacyUzytkownik');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.users).toHaveLength(0);
+  });
 });

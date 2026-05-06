@@ -4,10 +4,33 @@ import prisma from './db.js';
 
 const router = Router();
 
-router.get('/', async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const users = await prisma.user.findMany();
-    return res.status(200).json({ success: true, users });
+    const username = typeof req.query.username === 'string' ? req.query.username.trim() : '';
+    const email = typeof req.query.email === 'string' ? req.query.email.trim() : '';
+
+    const where: any = {};
+
+    if (username) {
+      where.username = {
+        contains: username,
+        mode: 'insensitive',
+      };
+    }
+
+    if (email) {
+      where.email = {
+        contains: email,
+        mode: 'insensitive',
+      };
+    }
+
+    const users = await prisma.user.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.status(200).json({ success: true, users });
   } catch (error) {
     next(error);
   }
