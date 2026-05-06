@@ -30,9 +30,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       where: { followeeId: authorId },
       select: { followerId: true }
     });
-    const followerIds = (followers as Array<{ followerId: number }>).map(
-      (f: { followerId: number }) => f.followerId
-    );
+    const followerIds = followers.map((f) => f.followerId);
 
     // Próba zapisu "Rich" danych do MongoDB przez HTTP
     const mongoPayload = {
@@ -131,7 +129,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
   try {
     // Najpierw usuń zależne rekordy (komentarze, reakcje), potem post.
     // Używamy sekwencyjnej transakcji (callback), żeby zagwarantować kolejność operacji.
-    await prisma.$transaction(async (tx: any) => {
+    await prisma.$transaction(async (tx) => {
       await tx.comment.deleteMany({ where: { postId } });
       await tx.reaction.deleteMany({ where: { postId } });
       await tx.post.delete({ where: { id: postId } });

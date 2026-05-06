@@ -22,7 +22,7 @@ const prismaClientSingleton = () => {
   const extended = base.$extends({
     query: {
       user: {
-        async create({ args, query }: any) {
+        async create({ args, query }) {
           try {
             if (args && args.data && args.data.email) {
               args.data.email = String(args.data.email).toLowerCase();
