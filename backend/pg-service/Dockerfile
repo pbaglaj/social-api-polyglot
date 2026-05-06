@@ -14,7 +14,7 @@ FROM node:18-alpine AS production
 WORKDIR /app
 COPY package*.json ./
 # Instalacja tylko pakietów produkcyjnych
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/src ./src

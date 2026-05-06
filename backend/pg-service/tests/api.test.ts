@@ -51,3 +51,71 @@ describe('API Integration Tests (PG Service)', () => {
   });
 
 });
+
+describe('PostgreSQL Error Code Mapping Tests', () => {
+
+  it('Powinien mapować kod 23505 (unique_violation) na HTTP 409 Conflict', async () => {
+    const testApp = express();
+    testApp.use(express.json());
+    testApp.get('/test', (req, res, next) => {
+      const err = new Error('Duplicate key value violates unique constraint');
+      (err as any).code = '23505';
+      next(err);
+    });
+    testApp.use(errorHandler);
+
+    const res = await request(testApp).get('/test');
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('Conflict');
+    expect(res.body.code).toBe('23505');
+  });
+
+  it('Powinien mapować kod 23503 (foreign_key_violation) na HTTP 400 Bad Request', async () => {
+    const testApp = express();
+    testApp.use(express.json());
+    testApp.get('/test', (req, res, next) => {
+      const err = new Error('Foreign key constraint violation');
+      (err as any).code = '23503';
+      next(err);
+    });
+    testApp.use(errorHandler);
+
+    const res = await request(testApp).get('/test');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Bad Request');
+    expect(res.body.code).toBe('23503');
+  });
+
+  it('Powinien mapować kod 23502 (not_null_violation) na HTTP 400 Bad Request', async () => {
+    const testApp = express();
+    testApp.use(express.json());
+    testApp.get('/test', (req, res, next) => {
+      const err = new Error('Null value not allowed');
+      (err as any).code = '23502';
+      next(err);
+    });
+    testApp.use(errorHandler);
+
+    const res = await request(testApp).get('/test');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Bad Request');
+    expect(res.body.code).toBe('23502');
+  });
+
+  it('Powinien mapować kod 08006 (connection_failure) na HTTP 503 Service Unavailable', async () => {
+    const testApp = express();
+    testApp.use(express.json());
+    testApp.get('/test', (req, res, next) => {
+      const err = new Error('Connection lost');
+      (err as any).code = '08006';
+      next(err);
+    });
+    testApp.use(errorHandler);
+
+    const res = await request(testApp).get('/test');
+    expect(res.status).toBe(503);
+    expect(res.body.error).toBe('Service Unavailable');
+    expect(res.body.code).toBe('08006');
+  });
+
+});

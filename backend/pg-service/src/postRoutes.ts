@@ -131,7 +131,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
   try {
     // Najpierw usuń zależne rekordy (komentarze, reakcje), potem post.
     // Używamy sekwencyjnej transakcji (callback), żeby zagwarantować kolejność operacji.
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       await tx.comment.deleteMany({ where: { postId } });
       await tx.reaction.deleteMany({ where: { postId } });
       await tx.post.delete({ where: { id: postId } });

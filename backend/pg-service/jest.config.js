@@ -1,13 +1,20 @@
 export default {
+  preset: 'ts-jest',
   testEnvironment: "node",
-  // Tell Jest to treat TypeScript files as ES Modules
   extensionsToTreatAsEsm: [".ts"],
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+  },
   transform: {
-    // Configure ts-jest to use ESM
     "^.+\\.ts$": [
       "ts-jest",
       {
         useESM: true,
+        tsconfig: {
+          ignoreDeprecations: "6.0",
+          module: "esnext",
+          moduleResolution: "node",
+        },
       },
     ],
   },
