@@ -3,8 +3,59 @@ import type { Request, Response } from 'express';
 import type { PipelineStage } from 'mongoose';
 import { UserFeedEntry } from './models/UserFeedEntry.js';
 import { ActivityDaily } from './models/ActivityDaily.js';
+import { getNativeDb } from './db.js';
 
 const router = Router();
+
+// Wymóg T5: Zasób domenowy sterownikiem natywnym
+router.post('/system-logs', async (req: Request, res: Response): Promise<any> => {
+  try {
+    const db = getNativeDb();
+    if (!db) throw new Error('Native DB client not initialized');
+    
+    const { level, message, metadata } = req.body;
+    const collection = db.collection('system_logs');
+    
+    const result = await collection.insertOne({
+      level: level || 'info',
+      message: message || '',
+      metadata: metadata || {},
+      timestamp: new Date()
+    });
+
+    return res.status(201).json({ success: true, id: result.insertedId });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({ error: 'Internal Server Error', code: 'LOG_WRITE_FAILED', details: message });
+  }
+});
+
+router.get('/system-logs', async (req: Request, res: Response): Promise<any> => {
+  try {
+    const db = getNativeDb();
+    if (!db) {
+      throw new Error('Native DB client not initialized');
+    }
+    const collection = db.collection('system_logs');
+    // Using 3 different native operators
+    const logs = await collection.find({
+      level: { $in: ['error', 'warn', 'info'] },
+      timestamp: { $gte: new Date(Date.now() - 86400000) } // last 24h
+    })
+    .sort({ timestamp: -1 })
+    .limit(50)
+    .toArray();
+
+    return res.json({ logs });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      code: 'NATIVE_QUERY_FAILED',
+      details: message
+    });
+  }
+});
 
 router.get('/trending', async (req: Request, res: Response): Promise<any> => {
   try {
