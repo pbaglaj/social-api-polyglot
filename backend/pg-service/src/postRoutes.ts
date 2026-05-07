@@ -70,14 +70,22 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
 // [...] (tutaj jest Twój dotychczasowy router.post('/'))
 
-// Wymóg T17: Pobieranie postów z filtrem (np. po ID autora)
+// Wymóg T17: Pobieranie postów z filtrem (np. po ID autora, lub hashtag)
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   const authorId = req.query.authorId ? parseInt(req.query.authorId as string, 10) : undefined;
+  const hashtag = req.query.hashtag as string;
+
   // Wymóg T4: Użycie surowego SQL ($queryRaw) jako alternatywy dla zaawansowanych filtrów
   try {
-    if (authorId) {
+    if (authorId && hashtag) {
+      const posts = await prisma.$queryRaw`SELECT * FROM "Post" WHERE "authorId" = ${authorId} AND "bodyPreview" ILIKE ${'%' + hashtag + '%'} ORDER BY "createdAt" DESC`;
+      return res.json(posts);
+    } else if (authorId) {
       // Dynamiczne zapytanie raw (Wymóg T2: bez sklejania stringów, bezpieczne parametryzowanie $1)
       const posts = await prisma.$queryRaw`SELECT * FROM "Post" WHERE "authorId" = ${authorId} ORDER BY "createdAt" DESC`;
+      return res.json(posts);
+    } else if (hashtag) {
+      const posts = await prisma.$queryRaw`SELECT * FROM "Post" WHERE "bodyPreview" ILIKE ${'%' + hashtag + '%'} ORDER BY "createdAt" DESC`;
       return res.json(posts);
     }
     

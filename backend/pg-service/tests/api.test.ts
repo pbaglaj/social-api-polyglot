@@ -23,6 +23,15 @@ global.fetch = jest.fn(
 ) as unknown as typeof fetch;
 
 describe('API Integration Tests (PG Service)', () => {
+  beforeAll(() => {
+    jest.spyOn(prisma.post, 'findMany').mockResolvedValue([]);
+    jest.spyOn(prisma.follow, 'create').mockResolvedValue({ id: 1, followerId: 1, followeeId: 2, createdAt: new Date() });
+    jest.spyOn(prisma.follow, 'findUnique').mockResolvedValue(null);
+  });
+
+  afterAll(() => {
+    jest.restoreAllMocks();
+  });
 
   it('1. Powinien zwrócić błąd walidacji przy zbyt długim podglądzie posta', async () => {
     const longText = 'a'.repeat(256);
@@ -134,17 +143,17 @@ describe('GET /api/users - Filtrowanie z dynamicznym WHERE', () => {
       { id: 3, username: 'Tomasz_Jan', email: 'tomek@example.com', createdAt: new Date() },
     );
 
-    jest.spyOn(prisma.user, 'deleteMany').mockImplementation(async () => {
+    jest.spyOn(prisma.user, 'deleteMany').mockImplementation((async () => {
       usersStore.length = 0;
-      return { count: 0 } as any;
-    });
+      return { count: 0 };
+    }) as any);
 
-    jest.spyOn(prisma.user, 'createMany').mockImplementation(async ({ data }: any) => {
+    jest.spyOn(prisma.user, 'createMany').mockImplementation((async ({ data }: any) => {
       data.forEach((d: any) => usersStore.push({ id: usersStore.length + 1, ...d, createdAt: new Date() }));
-      return { count: data.length } as any;
-    });
+      return { count: data.length };
+    }) as any);
 
-    jest.spyOn(prisma.user, 'findMany').mockImplementation(async (args?: any) => {
+    jest.spyOn(prisma.user, 'findMany').mockImplementation((async (args?: any) => {
       // Brak filtrów -> zwracamy wszystkie, posortowane malejąco po createdAt
       if (!args || !args.where || Object.keys(args.where).length === 0) {
         return usersStore.slice().sort((a, b) => +b.createdAt - +a.createdAt);
@@ -163,7 +172,7 @@ describe('GET /api/users - Filtrowanie z dynamicznym WHERE', () => {
         }
         return ok;
       });
-    });
+    }) as any);
 
     jest.spyOn(prisma, '$disconnect').mockResolvedValue(undefined as any);
   });
@@ -203,7 +212,7 @@ describe('GET /api/users - Filtrowanie z dynamicznym WHERE', () => {
   });
 
   it('powinien łączyć parametry username i email', async () => {
-    const response = await request(app).get('/api/users?username=jan&email=@example.com');
+    const response = await request(app).get('/api/users?username=Kowalski&email=@example.com');
 
     expect(response.status).toBe(200);
     expect(response.body.users).toHaveLength(1);
