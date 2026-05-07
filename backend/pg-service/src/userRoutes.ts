@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import type { Prisma } from '@prisma/client';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import prisma from './db.js';
 
 const router = Router();
@@ -51,7 +52,15 @@ router.post('/:id/follow', async (req: Request, res: Response, next: NextFunctio
     return;
   }
 
-  const { followerId } = req.body; // W prawdziwej aplikacji to ID pochodziłoby z tokena JWT
+  const followerIdParam = req.body?.followerId; // W prawdziwej aplikacji to ID pochodziłoby z tokena JWT
+  const followerId = typeof followerIdParam === 'string'
+    ? parseInt(followerIdParam, 10)
+    : Number(followerIdParam);
+
+  if (!Number.isInteger(followerId)) {
+    res.status(400).json({ error: 'Validation Error', code: 'INVALID_FOLLOWER_ID', details: 'Invalid follower ID.' });
+    return;
+  }
 
   // Wymóg T18: Blokada self-follow
   if (followerId === followeeId) {
@@ -64,14 +73,35 @@ router.post('/:id/follow', async (req: Request, res: Response, next: NextFunctio
   }
 
   try {
+    const existingFollow = await prisma.follow.findUnique({
+      where: { followerId_followeeId: { followerId, followeeId } },
+    });
+
+    if (existingFollow) {
+      res.status(409).json({
+        error: 'Conflict',
+        code: 'ALREADY_FOLLOWING',
+        details: 'Follow relationship already exists.',
+      });
+      return;
+    }
+
     const follow = await prisma.follow.create({
       data: { followerId, followeeId }
     });
     res.status(201).json({ success: true, follow });
     return;
   } catch (error) {
-    // Jeśli rekord już istnieje, nasz errorHandler złapie błąd P2002 i zwróci 409 Conflict
-    next(error); 
+    if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
+      res.status(409).json({
+        error: 'Conflict',
+        code: 'ALREADY_FOLLOWING',
+        details: 'Follow relationship already exists.',
+      });
+      return;
+    }
+
+    next(error);
   }
 });
 
@@ -88,13 +118,31 @@ router.delete('/:id/follow', async (req: Request, res: Response, next: NextFunct
     return;
   }
 
-  const { followerId } = req.body;
+  const followerIdParam = req.body?.followerId;
+  const followerId = typeof followerIdParam === 'string'
+    ? parseInt(followerIdParam, 10)
+    : Number(followerIdParam);
+
+  if (!Number.isInteger(followerId)) {
+    res.status(400).json({ error: 'Validation Error', code: 'INVALID_FOLLOWER_ID', details: 'Invalid follower ID.' });
+    return;
+  }
 
   try {
     // Usuwamy relację (Unfollow)
-    await prisma.follow.delete({
-      where: { followerId_followeeId: { followerId, followeeId } }
+    const result = await prisma.follow.deleteMany({
+      where: { followerId, followeeId }
     });
+
+    if (result.count === 0) {
+      res.status(404).json({
+        error: 'Not Found',
+        code: 'FOLLOW_NOT_FOUND',
+        details: 'Follow relationship does not exist.',
+      });
+      return;
+    }
+
     res.status(204).send();
     return;
   } catch (error) {
