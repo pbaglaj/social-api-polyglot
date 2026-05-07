@@ -41,7 +41,9 @@ const PG_ERROR_CODE_MAP: Record<string, { status: number; error: string; message
 };
 
 export const errorHandler = (err: any, req: Request, res: Response, next: NextFunction) => {
-  console.error('Błąd:', err);
+  if (process.env.NODE_ENV !== 'test') {
+       console.error('Błąd:', err);
+   }
 
   // Domyślny błąd
   let status = 500;

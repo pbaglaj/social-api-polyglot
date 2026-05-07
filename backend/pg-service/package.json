@@ -10,7 +10,7 @@
     "seed": "prisma db seed",
     "seed:test": "cross-env NODE_ENV=test node prisma/seed.test.js",
     "db:reset": "prisma migrate reset --force --skip-seed && npm run seed",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test": "cross-env NODE_ENV=test NODE_OPTIONS=--no-warnings node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "build": "tsc"
   },
   "keywords": [],
@@ -29,6 +29,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^25.6.0",
     "@types/supertest": "^7.2.0",
+    "cross-env": "^10.1.0",
     "jest": "^30.3.0",
     "prisma": "^6.6.0",
     "supertest": "^7.2.2",
