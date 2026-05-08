@@ -30,6 +30,10 @@ export const connectDB = async () => {
       await client.connect();
       globalForMongo.nativeClient = client;
       globalForMongo.nativeDb = client.db();
+      
+      // Tworzenie indeksu złożonego dla kolekcji obsługiwanej przez sterownik natywny (Wymóg T5)
+      await globalForMongo.nativeDb.collection('system_logs').createIndex({ level: 1, insertedAt: -1 });
+      
       console.log('Natywny klient MongoDB połączony (new).');
     } else {
       console.log('Reusing existing native MongoDB client.');
