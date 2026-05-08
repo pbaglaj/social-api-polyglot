@@ -1,0 +1,300 @@
+openapi: 3.0.0
+info:
+  title: Social Network API
+  description: Serwis backendowy z bazami PostgreSQL oraz MongoDB do zarządzania feedem, postami i interakcjami (sieć społecznościowa).
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/api
+    description: Główny API Gateway
+paths:
+  /posts:
+    post:
+      summary: Utworzenie postu i rozgłoszenie do obserwujących
+      description: Tworzy rekord zapisu postu w PostgreSQL oraz zdenormalizowane entry w systemie MongoDB dla całego feedu obserwatorów.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - authorId
+                - bodyPreview
+              properties:
+                authorId:
+                  type: integer
+                  example: 1
+                bodyPreview:
+                  type: string
+                  example: "Krótka zajawka postu"
+                attachments:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      url:
+                        type: string
+                        example: "http://img.com/1"
+                      type:
+                        type: string
+                        example: "image"
+                poll:
+                  type: object
+                  properties:
+                    question:
+                      type: string
+                      example: "Zgadzacie się?"
+                    options:
+                      type: array
+                      items:
+                        type: string
+                        example: ["Tak", "Nie"]
+      responses:
+        '201':
+          description: Sukces
+          content:
+            application/json:
+              example:
+                postId: 1
+                status: "success"
+        '400':
+          description: Złe żądanie (błąd walidacji)
+        '500':
+          description: Błąd zapisu, wywołano rollback PG
+    get:
+      summary: Pobiera listę postów
+      description: Pozwala na wyszukiwanie w postach po hasztagu lub ID autora.
+      parameters:
+        - in: query
+          name: authorId
+          schema:
+            type: integer
+        - in: query
+          name: hashtag
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Sukces
+          content:
+            application/json:
+              example:
+                - id: 1
+                  authorId: 1
+                  bodyPreview: "Wiadomość w systemie"
+                  createdAt: "2026-05-08T12:00:00.000Z"
+                  author:
+                    username: "janedoe"
+  /posts/{id}:
+    delete:
+      summary: Usuwa zadany post z bazy PG oraz odpala usuwanie kaskadowe z Mongo (lub Job)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Usunięto
+  /posts/{id}/reactions:
+    post:
+      summary: Dodaje nową reakcję
+      description: Operacja idempotentna reagowania na post.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: integer
+                  example: 1
+                type:
+                  type: string
+                  example: "LIKE"
+      responses:
+        '201':
+          description: Reakcja zapisana
+  /posts/{id}/comments:
+    post:
+      summary: Zwraca opcję dodania komentarza
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                authorId:
+                  type: integer
+                  example: 2
+                parentId:
+                  type: integer
+                  nullable: true
+                  example: null
+                content:
+                  type: string
+                  example: "Komentarz pod postem!"
+      responses:
+        '201':
+          description: Dodano pomyślnie
+    get:
+      summary: Pobiera drzewo komentarzy do postu
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Sukces
+          content:
+            application/json:
+              example:
+                - id: 1
+                  content: "Komentarz pod postem!"
+                  replies: []
+  /users:
+    get:
+      summary: Pobiera dane użytkowników testowych
+      responses:
+        '200':
+          description: OK
+  /users/{id}/follow:
+    post:
+      summary: Dodaje akcję obsewowania użytkownika (Follow)
+      description: Z blokadą self-follow.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                followerId:
+                  type: integer
+                  example: 1
+      responses:
+        '200':
+          description: Obserwujesz.
+    delete:
+      summary: Cofa akcję obsewowania użytkownika (Unfollow)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                followerId:
+                  type: integer
+                  example: 1
+      responses:
+        '200':
+          description: Przestałeś obserwować.
+  /feed/{userId}:
+    get:
+      summary: Pobiera prywatny zdenormalizowany feed użytkownika
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+        - in: query
+          name: cursor
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Pobrano feed (paginacja cursorem z MongoDB)
+          content:
+            application/json:
+              example:
+                data:
+                  - postId: 1
+                    score: 10
+                    insertedAt: "2026-05-08T12:00:00.000Z"
+                    richContent: 
+                      attachments: []
+                      poll: null
+                nextCursor: "2026-05-08T12:00:00.000Z"
+  /analytics/top-authors-weekly:
+    get:
+      summary: Analiza MongoDB pobierająca najlepszych autorów z tego tygodnia (Aggregation Pipeline)
+      responses:
+        '200':
+          description: OK
+  /analytics/reaction-distribution:
+    get:
+      summary: Analiza rozkładu reakcji z systemu MongoDB i PostgreSQL (Złączone Pipeline)
+      responses:
+        '200':
+          description: OK
+  /analytics/system-logs:
+    get:
+      summary: System dzienników wspierany na natywnym sterowniku MongoDB (MongoClient)
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Rejestrowanie logu systemowego z użyciem natywnego sterownika (T5)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                level:
+                  type: string
+                  example: "info"
+                message:
+                  type: string
+                  example: "System reboot"
+      responses:
+        '201':
+          description: Zapisano log
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        details:
+          type: object
