@@ -182,4 +182,57 @@ router.get('/top-authors-weekly', async (req: Request, res: Response): Promise<a
   }
 });
 
+// Wymóg T7: Rozkład reakcji (Pipeline: rozkład reakcji)
+router.get('/reaction-distribution', async (req: Request, res: Response): Promise<any> => {
+  try {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const pipeline: PipelineStage[] = [
+      // 1. $match po indeksie
+      {
+        $match: { day: { $gte: sevenDaysAgo } }
+      },
+      // 2. $project konwertujące typ Map na tablicę klucz/wartość do agregacji
+      {
+        $project: {
+          reactionsArray: { $objectToArray: "$reactionsGiven" }
+        }
+      },
+      // 3. $unwind: Rozbijamy tablicę obiektów
+      {
+        $unwind: { path: "$reactionsArray", preserveNullAndEmptyArrays: false }
+      },
+      // 4. $group sumujące całkowitą liczbę reakcji tego samego typu
+      {
+        $group: {
+          _id: "$reactionsArray.k",
+          totalCount: { $sum: "$reactionsArray.v" }
+        }
+      },
+      // 5. $sort
+      {
+        $sort: { totalCount: -1 as const }
+      },
+      {
+        $project: {
+          _id: 0,
+          reactionType: "$_id",
+          totalCount: 1
+        }
+      }
+    ];
+
+    const distribution = await ActivityDaily.aggregate(pipeline);
+    return res.json({ distribution });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      code: 'REACTION_DISTR_FAILED',
+      details: message
+    });
+  }
+});
+
 export default router;
