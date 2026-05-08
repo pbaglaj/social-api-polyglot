@@ -167,4 +167,59 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
   } catch (error) { next(error); }
 });
 
+// Wymóg T15: Komentarze z wątkiem (parent_id)
+router.post('/:id/comments', async (req: Request, res: Response, next: NextFunction) => {
+  const idParam = req.params.id;
+
+  if (typeof idParam !== 'string') {
+    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_POST_ID', details: 'Invalid post ID format.' });
+  }
+
+  const postId = parseInt(idParam, 10);
+  if (isNaN(postId)) {
+    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_POST_ID', details: 'Post ID must be a valid number.' });
+  }
+
+  const { authorId, content, parentId } = req.body;
+
+  // Prosta walidacja
+  if (!content || typeof content !== 'string' || content.trim() === '') {
+    return next({ name: 'ValidationError', message: 'Treść komentarza nie może być pusta.' });
+  }
+
+  try {
+    const comment = await prisma.comment.create({
+      data: {
+        postId,
+        authorId: Number(authorId),
+        content,
+        parentId: parentId ? Number(parentId) : null
+      }
+    });
+    res.status(201).json(comment);
+  } catch (error) { next(error); }
+});
+
+router.get('/:id/comments', async (req: Request, res: Response, next: NextFunction) => {
+  const idParam = req.params.id;
+
+  if (typeof idParam !== 'string') {
+    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_POST_ID', details: 'Invalid post ID format.' });
+  }
+
+  const postId = parseInt(idParam, 10);
+  if (isNaN(postId)) {
+    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_POST_ID', details: 'Post ID must be a valid number.' });
+  }
+
+  try {
+    const comments = await prisma.comment.findMany({
+      where: { postId },
+      orderBy: { createdAt: 'asc' },
+      include: { author: { select: { username: true } }, replies: true }
+    });
+    res.json(comments);
+  } catch (error) { next(error); }
+});
+
 export default router;
