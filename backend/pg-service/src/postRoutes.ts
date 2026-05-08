@@ -1,6 +1,7 @@
 import  { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import prisma from './db.js';
+import { validatePost, validateComment } from './validators.js';
 
 const router = Router();
 
@@ -8,12 +9,14 @@ const router = Router();
 const MONGO_SERVICE_URL = 'http://mongo-service:3002';
 
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
-  const { authorId, bodyPreview, attachments, poll } = req.body;
-
-  // Podstawowa walidacja (Wymóg T18: limit długości)
-  if (!bodyPreview || bodyPreview.length > 255) {
-    return next({ name: 'ValidationError', message: 'Treść musi mieć od 1 do 255 znaków.' });
+  let validatedData;
+  try {
+    validatedData = validatePost(req.body);
+  } catch (error) {
+    return next(error);
   }
+  
+  const { authorId, bodyPreview, attachments, poll } = validatedData;
 
   let createdPost;
 
@@ -180,12 +183,14 @@ router.post('/:id/comments', async (req: Request, res: Response, next: NextFunct
     return res.status(400).json({ error: 'Validation Error', code: 'INVALID_POST_ID', details: 'Post ID must be a valid number.' });
   }
 
-  const { authorId, content, parentId } = req.body;
-
-  // Prosta walidacja
-  if (!content || typeof content !== 'string' || content.trim() === '') {
-    return next({ name: 'ValidationError', message: 'Treść komentarza nie może być pusta.' });
+  let validatedComment;
+  try {
+    validatedComment = validateComment(req.body);
+  } catch (error) {
+    return next(error);
   }
+
+  const { authorId, content, parentId } = validatedComment;
 
   try {
     const comment = await prisma.comment.create({
