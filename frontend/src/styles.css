@@ -15,6 +15,8 @@ ul{list-style:none;padding-left:0;margin:0}
 .post-body{font-size:14px;margin-bottom:8px}
 .post-actions{display:flex;gap:8px;align-items:center}
 button{background:var(--accent);color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer}
+.delete-post{background:#b91c1c}
+.delete-post:hover{background:#991b1b}
 button:disabled{opacity:.6}
 .status{margin-top:8px;color:#444}
 label{display:inline-block;margin-right:8px}

@@ -24,17 +24,20 @@ async function loadPosts() {
 function renderPosts(posts) {
   const list = $('postsList');
   list.innerHTML = '';
+  const currentUserId = parseInt($('followerId').value, 10) || 1;
   posts.forEach(p => {
     const li = document.createElement('li');
     li.className = 'post';
     // Pokaż reaction count jeśli backend go zwraca (_count.reactions)
     const reactionCount = p._count?.reactions || 0;
     const authorName = (p.author && p.author.username) || `user-${p.authorId || 'unknown'}`;
+    const canDelete = Number(p.authorId) === Number(currentUserId);
     li.innerHTML = `<div class="post-header">${escapeHtml(authorName)} • ID: ${p.authorId || 'brak'} • Post #${p.id}</div>
       <div class="post-body">${escapeHtml(p.bodyPreview || '')}</div>
       <div class="post-actions">
         <button data-id="${p.id}" class="react">❤️ Like (${reactionCount})</button>
         <button data-id="${p.id}" class="toggle-comments">💬 Komentarze</button>
+        ${canDelete ? `<button data-id="${p.id}" class="delete-post">🗑️ Usuń post</button>` : ''}
       </div>
       <div class="comments-panel hidden" data-post-id="${p.id}">
         <ul class="comments-list" data-post-id="${p.id}"></ul>
@@ -48,6 +51,7 @@ function renderPosts(posts) {
   list.querySelectorAll('.react').forEach(btn => btn.addEventListener('click', onReact));
   list.querySelectorAll('.toggle-comments').forEach(btn => btn.addEventListener('click', onToggleComments));
   list.querySelectorAll('.add-comment').forEach(btn => btn.addEventListener('click', onAddComment));
+  list.querySelectorAll('.delete-post').forEach(btn => btn.addEventListener('click', onDeletePost));
 }
 
 function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -188,6 +192,43 @@ async function onReact(e){
   } finally {
     if (button && document.body.contains(button)) {
       button.disabled = false;
+    }
+  }
+}
+
+async function onDeletePost(e) {
+  const button = e.currentTarget;
+  if (!button) {
+    return;
+  }
+
+  const postId = button.dataset.id;
+  if (!postId) {
+    return;
+  }
+
+  const confirmed = window.confirm('Czy na pewno chcesz usunąć ten post?');
+  if (!confirmed) {
+    return;
+  }
+
+  const requesterId = parseInt($('followerId').value, 10) || 1;
+
+  try {
+    button.disabled = true;
+    button.textContent = 'Usuwanie...';
+    await request(`/posts/${postId}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ requesterId })
+    });
+    await loadPosts();
+  } catch (err) {
+    console.error('Delete post error:', err);
+    alert('Błąd usuwania posta: ' + err.message);
+  } finally {
+    if (button && document.body.contains(button)) {
+      button.disabled = false;
+      button.textContent = '🗑️ Usuń post';
     }
   }
 }
