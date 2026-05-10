@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mini Social - Frontend</title>
+  <link rel="stylesheet" href="src/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Mini Social — Frontend</h1>
+    <div class="config">
+      <label>API Base: <input id="apiBase" placeholder="http://localhost:8080/api" value="http://localhost:8080/api" /></label>
+      <button id="refreshBtn">Refresh</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel" id="createPost">
+      <h2>Dodaj post</h2>
+      <label>Author ID: <input id="newAuthorId" type="number" value="1" /></label>
+      <label>Treść: <input id="newBody" placeholder="Krótki podgląd treści" /></label>
+      <button id="createPostBtn">Utwórz</button>
+      <div id="createStatus" class="status"></div>
+    </section>
+
+    <section class="panel" id="users">
+      <h2>Użytkownicy</h2>
+      <div class="controls">
+        <label>Follower ID (you): <input id="followerId" type="number" value="1" /></label>
+        <button id="loadUsersBtn">Załaduj użytkowników</button>
+      </div>
+      <ul id="usersList"></ul>
+    </section>
+
+    <section class="panel" id="posts">
+      <h2>Posty</h2>
+      <div class="controls">
+        <button id="loadPostsBtn">Załaduj posty</button>
+        <label>Feed for user ID: <input id="feedUserId" type="number" value="1" /></label>
+        <button id="loadFeedBtn">Załaduj feed</button>
+      </div>
+      <ul id="postsList"></ul>
+    </section>
+  </main>
+
+  <script src="src/app.js"></script>
+</body>
+</html>
