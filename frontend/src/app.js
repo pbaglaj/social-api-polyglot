@@ -214,23 +214,54 @@ async function loadUsers(){
     const ul = $('usersList'); ul.innerHTML = '';
     users.forEach(u => {
       const li = document.createElement('li');
-      li.innerHTML = `<span>${u.id} • ${escapeHtml(u.username||u.email||'user')}</span> <button data-id="${u.id}" class="follow">Follow</button>`;
+      li.innerHTML = `<span>${u.id} • ${escapeHtml(u.username||u.email||'user')}</span>
+        <button data-id="${u.id}" class="follow">Follow</button>
+        <button data-id="${u.id}" class="unfollow">Unfollow</button>`;
       ul.appendChild(li);
     });
     ul.querySelectorAll('.follow').forEach(b=>b.addEventListener('click', onFollow));
+    ul.querySelectorAll('.unfollow').forEach(b=>b.addEventListener('click', onUnfollow));
   }catch(e){ alert('Błąd ładowania użytkowników: '+e.message); }
 }
 
 async function onFollow(e){
-  const id = e.currentTarget.dataset.id;
+  const button = e.currentTarget;
+  if (!button) {
+    return;
+  }
+
+  const id = button.dataset.id;
   const followerId = parseInt($('followerId').value,10) || 1;
   try{
+    button.disabled = true;
     const res = await request(`/users/${id}/follow`, { method: 'POST', body: JSON.stringify({ followerId }) });
     console.log('Follow response:', res);
     alert('Followed user ' + id);
   }catch(err){ 
     console.error('Follow error:', err);
     alert('Błąd follow: '+err.message); 
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function onUnfollow(e){
+  const button = e.currentTarget;
+  if (!button) {
+    return;
+  }
+
+  const id = button.dataset.id;
+  const followerId = parseInt($('followerId').value,10) || 1;
+  try{
+    button.disabled = true;
+    await request(`/users/${id}/follow`, { method: 'DELETE', body: JSON.stringify({ followerId }) });
+    alert('Unfollowed user ' + id);
+  }catch(err){
+    console.error('Unfollow error:', err);
+    alert('Błąd unfollow: ' + err.message);
+  } finally {
+    button.disabled = false;
   }
 }
 
