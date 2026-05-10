@@ -53,7 +53,4 @@ RichPostSchema.statics.findByPostId = function(postId: number) {
   return this.findOne({ postId });
 };
 
-// Indeks ułatwiający szybkie wyszukiwanie
-RichPostSchema.index({ postId: 1 });
-
 export const RichPost = mongoose.model<IRichPost, RichPostModel>('RichPost', RichPostSchema);
