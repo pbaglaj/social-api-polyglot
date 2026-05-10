@@ -29,17 +29,141 @@ function renderPosts(posts) {
     li.className = 'post';
     // Pokaż reaction count jeśli backend go zwraca (_count.reactions)
     const reactionCount = p._count?.reactions || 0;
-    li.innerHTML = `<div class="post-header">#${p.id} • ${p.authorId || (p.author && p.author.username) || 'anon'}</div>
+    const authorName = (p.author && p.author.username) || `user-${p.authorId || 'unknown'}`;
+    li.innerHTML = `<div class="post-header">${escapeHtml(authorName)} • ID: ${p.authorId || 'brak'} • Post #${p.id}</div>
       <div class="post-body">${escapeHtml(p.bodyPreview || '')}</div>
       <div class="post-actions">
         <button data-id="${p.id}" class="react">❤️ Like (${reactionCount})</button>
+        <button data-id="${p.id}" class="toggle-comments">💬 Komentarze</button>
+      </div>
+      <div class="comments-panel hidden" data-post-id="${p.id}">
+        <ul class="comments-list" data-post-id="${p.id}"></ul>
+        <div class="comment-form">
+          <input class="comment-content" data-post-id="${p.id}" placeholder="Napisz komentarz..." />
+          <button data-id="${p.id}" class="add-comment">Dodaj komentarz</button>
+        </div>
       </div>`;
     list.appendChild(li);
   });
   list.querySelectorAll('.react').forEach(btn => btn.addEventListener('click', onReact));
+  list.querySelectorAll('.toggle-comments').forEach(btn => btn.addEventListener('click', onToggleComments));
+  list.querySelectorAll('.add-comment').forEach(btn => btn.addEventListener('click', onAddComment));
 }
 
 function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderComments(comments, postId) {
+  const list = document.querySelector(`.comments-list[data-post-id="${postId}"]`);
+  if (!list) {
+    return;
+  }
+
+  const groupedByParent = new Map();
+  (comments || []).forEach(comment => {
+    const key = comment.parentId == null ? 'root' : String(comment.parentId);
+    if (!groupedByParent.has(key)) {
+      groupedByParent.set(key, []);
+    }
+    groupedByParent.get(key).push(comment);
+  });
+
+  const renderLevel = (parentKey, depth) => {
+    const entries = groupedByParent.get(parentKey) || [];
+    return entries.map(comment => {
+      const authorName = (comment.author && comment.author.username) || `user-${comment.authorId}`;
+      const children = renderLevel(String(comment.id), depth + 1);
+      return `<li class="comment-item depth-${Math.min(depth, 4)}">
+        <div class="comment-meta">${escapeHtml(authorName)} • ID: ${comment.authorId} • Komentarz #${comment.id}</div>
+        <div class="comment-content">${escapeHtml(comment.content || '')}</div>
+        ${children ? `<ul class="comment-children">${children}</ul>` : ''}
+      </li>`;
+    }).join('');
+  };
+
+  const html = renderLevel('root', 0);
+  list.innerHTML = html || '<li class="comment-empty">Brak komentarzy.</li>';
+}
+
+async function loadComments(postId) {
+  const panel = document.querySelector(`.comments-panel[data-post-id="${postId}"]`);
+  if (!panel) {
+    return;
+  }
+
+  const comments = await request(`/posts/${postId}/comments`);
+  renderComments(comments || [], postId);
+  panel.dataset.loaded = 'true';
+}
+
+async function onToggleComments(e) {
+  const button = e.currentTarget;
+  if (!button) {
+    return;
+  }
+
+  const postId = button.dataset.id;
+  const panel = document.querySelector(`.comments-panel[data-post-id="${postId}"]`);
+  if (!panel) {
+    return;
+  }
+
+  const shouldOpen = panel.classList.contains('hidden');
+  panel.classList.toggle('hidden');
+  button.textContent = shouldOpen ? '💬 Ukryj komentarze' : '💬 Komentarze';
+
+  if (shouldOpen && panel.dataset.loaded !== 'true') {
+    try {
+      button.disabled = true;
+      await loadComments(postId);
+    } catch (err) {
+      alert('Błąd ładowania komentarzy: ' + err.message);
+    } finally {
+      button.disabled = false;
+    }
+  }
+}
+
+async function onAddComment(e) {
+  const button = e.currentTarget;
+  if (!button) {
+    return;
+  }
+
+  const postId = button.dataset.id;
+  const contentInput = document.querySelector(`.comment-content[data-post-id="${postId}"]`);
+  const panel = document.querySelector(`.comments-panel[data-post-id="${postId}"]`);
+
+  if (!contentInput || !panel) {
+    return;
+  }
+
+  const content = contentInput.value.trim();
+  if (!content) {
+    alert('Treść komentarza nie może być pusta.');
+    return;
+  }
+
+  const authorId = parseInt($('followerId').value, 10) || 1;
+
+  const payload = {
+    authorId,
+    content
+  };
+
+  try {
+    button.disabled = true;
+    button.textContent = 'Dodawanie...';
+    await request(`/posts/${postId}/comments`, { method: 'POST', body: JSON.stringify(payload) });
+    contentInput.value = '';
+    panel.classList.remove('hidden');
+    await loadComments(postId);
+  } catch (err) {
+    alert('Błąd dodawania komentarza: ' + err.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Dodaj komentarz';
+  }
+}
 
 async function onReact(e){
   const button = e.currentTarget;

@@ -12,8 +12,26 @@ ul{list-style:none;padding-left:0;margin:0}
 .post{padding:10px;border-bottom:1px solid #eee}
 .post-header{font-size:12px;color:#555;margin-bottom:6px}
 .post-body{font-size:14px;margin-bottom:8px}
+.post-actions{display:flex;gap:8px;align-items:center}
 button{background:var(--accent);color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer}
 button:disabled{opacity:.6}
 .status{margin-top:8px;color:#444}
 label{display:inline-block;margin-right:8px}
+.hidden{display:none}
+
+.comments-panel{margin-top:10px;padding:10px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px}
+.comments-list{display:flex;flex-direction:column;gap:8px}
+.comment-item{padding:8px;border:1px solid #e5e7eb;background:#fff;border-radius:6px}
+.comment-meta{font-size:12px;color:#4b5563;margin-bottom:4px}
+.comment-content{font-size:14px}
+.comment-children{margin:8px 0 0 12px;padding-left:0;display:flex;flex-direction:column;gap:8px}
+.depth-1,.depth-2,.depth-3,.depth-4{border-left:3px solid #bfdbfe}
+.comment-empty{color:#6b7280;font-size:13px}
+
+.comment-form{margin-top:10px;display:grid;grid-template-columns:1fr auto;gap:8px}
+.comment-form input{padding:6px 8px;border:1px solid #d1d5db;border-radius:6px}
+
+@media(max-width:900px){
+	.comment-form{grid-template-columns:1fr}
+}
 @media(max-width:900px){main{grid-template-columns:1fr;}}
