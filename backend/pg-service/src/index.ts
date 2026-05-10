@@ -6,14 +6,16 @@ import { errorHandler } from './errorHandler.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000);
+const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX || (process.env.NODE_ENV === 'production' ? 100 : 1000));
 
 // Middleware for parsing JSON and trusting proxy headers (if behind a reverse proxy)
 app.use(express.json());
 app.set('trust proxy', 1);
 
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit 100 requests per IP within 15 minutes
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  max: RATE_LIMIT_MAX,
   message: { error: 'Too Many Requests', code: 429, details: 'Exceeded request limit. Please try again later.' },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false,

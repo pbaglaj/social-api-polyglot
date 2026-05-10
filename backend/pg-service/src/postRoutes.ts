@@ -1,5 +1,6 @@
 import  { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
+import type { Prisma } from '@prisma/client';
 import prisma from './db.js';
 import { validatePost, validateComment } from './validators.js';
 
@@ -78,22 +79,45 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   const authorId = req.query.authorId ? parseInt(req.query.authorId as string, 10) : undefined;
   const hashtag = req.query.hashtag as string;
 
-  // Wymóg T4: Użycie surowego SQL ($queryRaw) jako alternatywy dla zaawansowanych filtrów
   try {
+    // Zmienna przechowująca odfiltrowane ID z surowego zapytania
+    let filteredIds: number[] | null = null;
+
+    // Wymóg T4: Użycie surowego SQL ($queryRaw) jako alternatywy dla zaawansowanych filtrów
     if (authorId && hashtag) {
-      const posts = await prisma.$queryRaw`SELECT * FROM "Post" WHERE "authorId" = ${authorId} AND "bodyPreview" ILIKE ${'%' + hashtag + '%'} ORDER BY "createdAt" DESC`;
-      return res.json(posts);
+      const rawPosts = await prisma.$queryRaw<{id: number}[]>`SELECT "id" FROM "Post" WHERE "authorId" = ${authorId} AND "bodyPreview" ILIKE ${'%' + hashtag + '%'}`;
+      filteredIds = rawPosts.map(p => p.id);
     } else if (authorId) {
-      // Dynamiczne zapytanie raw (Wymóg T2: bez sklejania stringów, bezpieczne parametryzowanie $1)
-      const posts = await prisma.$queryRaw`SELECT * FROM "Post" WHERE "authorId" = ${authorId} ORDER BY "createdAt" DESC`;
-      return res.json(posts);
+      // Dynamiczne zapytanie raw (Wymóg T2: bez sklejania stringów, bezpieczne parametryzowanie)
+      const rawPosts = await prisma.$queryRaw<{id: number}[]>`SELECT "id" FROM "Post" WHERE "authorId" = ${authorId}`;
+      filteredIds = rawPosts.map(p => p.id);
     } else if (hashtag) {
-      const posts = await prisma.$queryRaw`SELECT * FROM "Post" WHERE "bodyPreview" ILIKE ${'%' + hashtag + '%'} ORDER BY "createdAt" DESC`;
-      return res.json(posts);
+      const rawPosts = await prisma.$queryRaw<{id: number}[]>`SELECT "id" FROM "Post" WHERE "bodyPreview" ILIKE ${'%' + hashtag + '%'}`;
+      filteredIds = rawPosts.map(p => p.id);
     }
+
+    // Budujemy ostateczne zapytanie w Prisma
+    const where: Prisma.PostWhereInput = {};
     
-    // Zwykłe zapytanie Prisma
-    const posts = await prisma.post.findMany({ orderBy: { createdAt: 'desc' } });
+    // Jeśli użyliśmy surowego SQL do filtrowania, ograniczamy wyniki do znalezionych ID
+    if (filteredIds !== null) {
+      where.id = { in: filteredIds };
+    }
+
+    // Pobieramy pełne dane z relacjami. Gwarantuje to strukturę identyczną jak w kodzie "po".
+    const posts = await prisma.post.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        author: { select: { username: true } },
+        _count: {
+          select: {
+            reactions: true
+          }
+        }
+      }
+    });
+
     res.json(posts);
   } catch (error) { next(error); }
 });
