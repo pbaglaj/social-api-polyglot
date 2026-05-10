@@ -177,7 +177,39 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
     });
   }
 
+  // Brak auth tokenów w projekcie, więc identyfikator "wysyłającego" przyjmujemy z body.
+  const requesterIdRaw = req.body?.requesterId ?? req.body?.userId ?? req.body?.authorId ?? req.body?.followerId;
+  const requesterId = typeof requesterIdRaw === 'string' ? parseInt(requesterIdRaw, 10) : Number(requesterIdRaw);
+  if (!Number.isInteger(requesterId)) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      code: 'INVALID_REQUESTER_ID',
+      details: 'Requester ID must be a valid number.'
+    });
+  }
+
   try {
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { id: true, authorId: true }
+    });
+
+    if (!post) {
+      return res.status(404).json({
+        error: 'Not Found',
+        code: 'POST_NOT_FOUND',
+        details: 'Post not found.'
+      });
+    }
+
+    if (post.authorId !== requesterId) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        code: 'NOT_POST_OWNER',
+        details: 'Only the post owner can delete this post.'
+      });
+    }
+
     // Najpierw usuń zależne rekordy (komentarze, reakcje), potem post.
     // Używamy sekwencyjnej transakcji (callback), żeby zagwarantować kolejność operacji.
     await prisma.$transaction(async (tx) => {
