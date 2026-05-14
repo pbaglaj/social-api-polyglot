@@ -8,10 +8,17 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  username  String   @unique
-  email     String   @unique
-  createdAt DateTime @default(now())
+  id          Int      @id @default(autoincrement())
+  username    String   @unique
+  email       String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+
+  bio         String?
+  avatarUrl   String?
+  displayName String?  @db.VarChar(50)
+  location    String?  @db.VarChar(100)
+  isVerified  Boolean  @default(false)
 
   posts     Post[]
   comments  Comment[]
