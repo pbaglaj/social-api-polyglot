@@ -41,6 +41,68 @@ Wysoka skalowalność odczytów (feedów) jest realizowana przez schemat "fan-ou
 4. Następnie następuje rozproszenie referencji tego zdarzenia (wzorzec fan-out): wpis kopiowany jest kaskadowo do kolekcji feedów wszystkich aktualnie obserwujących (`user_feed_entries`), co pozwala klientowi pobrać zoptymalizowaną z góry pre-konstruowaną oś czasu z poziomu Mongo.
 5. W systemie zaimplementowano odpowiednią strategię, reagującą na błędy: np. anulowanie zdarzenia w PG (kompensacja), jeśli aktualizacja po stronie Mongo zakończyła się krytycznym błędem przedwcześnie.
 
+### Diagram sekwencji — tworzenie posta (fan-out + kompensacja)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client
+    participant GW as API Gateway (nginx)
+    participant PG as pg-service (PostgreSQL)
+    participant MS as mongo-service (MongoDB)
+
+    Client->>GW: POST /api/posts
+    GW->>PG: POST /api/posts
+    PG->>PG: INSERT Post
+    PG->>PG: SELECT followers WHERE followeeId = authorId
+    PG->>MS: POST /api/internal/rich-posts (postId, attachments, followerIds)
+    MS->>MS: insert RichPost
+    MS->>MS: insertMany UserFeedEntry (fan-out)
+    MS->>MS: upsert ActivityDaily
+    MS-->>PG: 201 OK
+    PG-->>Client: 201 Created
+
+    Note over PG,MS: Sciezka kompensacji (blad po stronie Mongo)
+    PG->>MS: POST /api/internal/rich-posts
+    MS-->>PG: 500 (MONGO_WRITE_FAILED)
+    PG->>PG: DELETE Post (rollback / kompensacja)
+    PG-->>Client: 500 z jednolitym formatem bledu
+```
+
+### Diagram sekwencji — odczyt feedu
+
+```mermaid
+sequenceDiagram
+    actor Client
+    participant GW as API Gateway
+    participant MS as mongo-service
+
+    Client->>GW: GET /api/feed/:userId?cursor=...&limit=...
+    GW->>MS: GET /api/feed/:userId
+    MS->>MS: UserFeedEntry.find({ userId, insertedAt: { $lt: cursor } })
+    MS->>MS: populate richPost (RichPost)
+    MS-->>Client: { data: [...], nextCursor }
+```
+
+## Testy
+
+Projekt ma dwa zestawy testów dla `pg-service`:
+
+* **Testy jednostkowe / API z mockami** — `npm test` w `backend/pg-service/`. Nie wymagają działającej bazy, mockują Prisma Client (`jest.spyOn`).
+* **Testy integracyjne z realnym PostgreSQL** — `npm run test:integration`. Wymagają działającego Postgresa pod adresem z `DATABASE_URL`, z zaaplikowanymi migracjami. Test czyści tabele przed/po, więc **należy je odpalać przeciwko testowej bazie**, nie produkcyjnej.
+
+Zalecany sposób uruchomienia testów integracyjnych:
+
+```bash
+cd backend
+docker-compose up -d postgres
+cd pg-service
+npx prisma migrate deploy
+npm run test:integration
+```
+
+Domyślne `npm test` pomija testy z folderu `tests/integration/` przez flagę `RUN_INTEGRATION` (sterowanie przez `describe.skip`), więc CI bez bazy nadal przechodzi.
+
 ## Kwestie Bezpieczeństwa
 
 W aplikacji zastosowano techniki obrony przed popularnymi zagrożeniami wektorowymi:
