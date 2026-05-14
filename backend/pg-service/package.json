@@ -11,6 +11,7 @@
     "seed:test": "cross-env NODE_ENV=test node prisma/seed.test.js",
     "db:reset": "prisma migrate reset --force --skip-seed && npm run seed",
     "test": "cross-env NODE_ENV=test NODE_OPTIONS=--no-warnings node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:integration": "cross-env NODE_ENV=test RUN_INTEGRATION=true NODE_OPTIONS=--no-warnings node --experimental-vm-modules node_modules/jest/bin/jest.js tests/integration",
     "build": "tsc"
   },
   "keywords": [],
