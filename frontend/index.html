@@ -8,9 +8,10 @@
 </head>
 <body>
   <header>
-    <h1>Mini Social — Frontend</h1>
+    <h1>Mini Social — Frontend (demo)</h1>
     <div class="config">
       <label>API Base: <input id="apiBase" placeholder="http://localhost:8080/api" value="http://localhost:8080/api" /></label>
+      <label>Twoje user ID: <input id="followerId" type="number" value="1" /></label>
       <button id="refreshBtn">Refresh</button>
     </div>
   </header>
@@ -18,17 +19,33 @@
   <main>
     <section class="panel" id="createPost">
       <h2>Dodaj post</h2>
-      <label>Author ID: <input id="newAuthorId" type="number" value="1" /></label>
-      <label>Treść: <input id="newBody" placeholder="Krótki podgląd treści" /></label>
-      <button id="createPostBtn">Utwórz</button>
+      <div class="row">
+        <label>Author ID: <input id="newAuthorId" type="number" value="1" /></label>
+        <label class="grow">Treść: <input id="newBody" placeholder="Krótki podgląd treści (możesz dodać #hashtag)" /></label>
+      </div>
+      <details>
+        <summary>Rich content (attachments / poll) — opcjonalnie</summary>
+        <div class="row">
+          <label class="grow">Attachments (JSON tablica):
+            <input id="newAttachments" placeholder='[{"type":"image","url":"..."}]' />
+          </label>
+        </div>
+        <div class="row">
+          <label class="grow">Poll (JSON):
+            <input id="newPoll" placeholder='{"question":"?","options":[{"text":"a"},{"text":"b"}]}' />
+          </label>
+        </div>
+      </details>
+      <button id="createPostBtn">Utwórz post</button>
       <div id="createStatus" class="status"></div>
     </section>
 
     <section class="panel" id="users">
       <h2>Użytkownicy</h2>
       <div class="controls">
-        <label>Follower ID (you): <input id="followerId" type="number" value="1" /></label>
-        <button id="loadUsersBtn">Załaduj użytkowników</button>
+        <label>Username: <input id="userSearchUsername" placeholder="np. anna" /></label>
+        <label>Email: <input id="userSearchEmail" placeholder="np. @gmail" /></label>
+        <button id="loadUsersBtn">Szukaj / Załaduj</button>
       </div>
       <ul id="usersList"></ul>
     </section>
@@ -37,10 +54,66 @@
       <h2>Posty</h2>
       <div class="controls">
         <button id="loadPostsBtn">Załaduj posty</button>
-        <label>Feed for user ID: <input id="feedUserId" type="number" value="1" /></label>
-        <button id="loadFeedBtn">Załaduj feed</button>
+        <label>Filtr authorId: <input id="filterAuthorId" type="number" placeholder="brak" /></label>
+        <label>Filtr hashtag: <input id="filterHashtag" placeholder="np. tech" /></label>
+        <button id="filterPostsBtn">Filtruj</button>
+        <span class="sep">|</span>
+        <label>Typ reakcji:
+          <select id="reactionType">
+            <option value="like">like</option>
+            <option value="love">love</option>
+            <option value="haha">haha</option>
+            <option value="wow">wow</option>
+            <option value="sad">sad</option>
+            <option value="angry">angry</option>
+          </select>
+        </label>
       </div>
       <ul id="postsList"></ul>
+    </section>
+
+    <section class="panel" id="feed">
+      <h2>Feed (Mongo)</h2>
+      <div class="controls">
+        <label>User ID: <input id="feedUserId" type="number" value="1" /></label>
+        <label>Limit: <input id="feedLimit" type="number" value="10" /></label>
+        <button id="loadFeedBtn">Załaduj feed</button>
+        <button id="loadFeedNextBtn" disabled>Następna strona</button>
+      </div>
+      <ul id="feedList"></ul>
+      <div id="feedStatus" class="status"></div>
+    </section>
+
+    <section class="panel" id="analytics">
+      <h2>Analityka (Mongo)</h2>
+      <div class="controls wrap">
+        <button data-endpoint="/analytics/trending" class="analytics-btn">Trending posts</button>
+        <button data-endpoint="/analytics/top-authors-weekly" class="analytics-btn">Top authors (tydzień)</button>
+        <button data-endpoint="/analytics/reaction-distribution" class="analytics-btn">Rozkład reakcji</button>
+        <button data-endpoint="/analytics/system-logs" class="analytics-btn">System logs</button>
+      </div>
+      <pre id="analyticsResult" class="result"></pre>
+    </section>
+
+    <section class="panel" id="systemLogs">
+      <h2>Zapis system log</h2>
+      <div class="row">
+        <label>Level:
+          <select id="logLevel">
+            <option>info</option>
+            <option>warn</option>
+            <option>error</option>
+          </select>
+        </label>
+        <label class="grow">Message: <input id="logMessage" placeholder="treść loga" /></label>
+      </div>
+      <div class="row">
+        <label class="grow">Metadata (JSON, opcjonalnie):
+          <input id="logMetadata" placeholder='{"source":"demo"}' />
+        </label>
+        <button id="sendLogBtn">Wyślij log</button>
+      </div>
+      <div id="logStatus" class="status"></div>
     </section>
   </main>
 
