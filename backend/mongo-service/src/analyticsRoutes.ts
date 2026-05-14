@@ -37,10 +37,12 @@ router.get('/system-logs', async (req: Request, res: Response): Promise<any> => 
       throw new Error('Native DB client not initialized');
     }
     const collection = db.collection('system_logs');
-    // Using 3 different native operators
+    // Wymog T5: min. 3 rozne operatory w realnych endpointach.
+    // Tutaj uzywamy $in, $gte, $exists oraz $ne (4 operatory).
     const logs = await collection.find({
       level: { $in: ['error', 'warn', 'info'] },
-      timestamp: { $gte: new Date(Date.now() - 86400000) } // last 24h
+      timestamp: { $gte: new Date(Date.now() - 86400000) }, // ostatnie 24h
+      message: { $exists: true, $ne: '' } // pomijamy logi bez tresci
     })
     .sort({ timestamp: -1 })
     .limit(50)
