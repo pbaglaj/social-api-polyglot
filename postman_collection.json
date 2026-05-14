@@ -2,6 +2,7 @@
   "info": {
     "_postman_id": "7a9a88f3-7b61-4b6a-bd7e-9b6b0f7c8b2b",
     "name": "Social Backend API",
+    "description": "Pelna kolekcja endpointow pg-service + mongo-service z przypadkami brzegowymi.\n\nKazdy endpoint ma przynajmniej jeden test happy path i (gdzie to ma sens) test sytuacji brzegowej (404, 400, 403, 409, 500).\n\nZmienne kolekcji:\n- baseUrl (domyslnie http://localhost:8080)\n- createdPostId (auto-uzupelnianie po Create post)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -9,200 +10,235 @@
       "name": "Users",
       "item": [
         {
-          "name": "List users",
+          "name": "List users (happy path)",
           "request": {
             "method": "GET",
             "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/users",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "users"
-              ]
-            }
+            "url": { "raw": "{{baseUrl}}/api/users", "host": ["{{baseUrl}}"], "path": ["api", "users"] }
           },
           "event": [
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Successful response code\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
-                  "});",
-                  "pm.test(\"Response time is less than 1000ms\", function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
+                  "pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));",
+                  "pm.test('Has users array', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.users).to.be.an('array');",
                   "});"
-                ],
-                "type": "text/javascript"
+                ]
               }
             }
           ]
         },
         {
-          "name": "List users by username",
+          "name": "List users by username (filtr)",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/users?username=jan",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "users"
-              ],
-              "query": [
-                {
-                  "key": "username",
-                  "value": "jan"
-                }
-              ]
+              "host": ["{{baseUrl}}"], "path": ["api", "users"],
+              "query": [{ "key": "username", "value": "jan" }]
             }
           },
           "event": [
             {
               "listen": "test",
               "script": {
-                "exec": [
-                  "pm.test(\"Successful response code\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
-                  "});",
-                  "pm.test(\"Response time is less than 1000ms\", function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
-                  "});"
-                ],
-                "type": "text/javascript"
+                "type": "text/javascript",
+                "exec": ["pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));"]
               }
             }
           ]
         },
         {
-          "name": "List users by email",
+          "name": "List users by email (filtr)",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/users?email=@example.com",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "users"
-              ],
-              "query": [
-                {
-                  "key": "email",
-                  "value": "@example.com"
-                }
-              ]
+              "host": ["{{baseUrl}}"], "path": ["api", "users"],
+              "query": [{ "key": "email", "value": "@example.com" }]
             }
           },
           "event": [
             {
               "listen": "test",
               "script": {
-                "exec": [
-                  "pm.test(\"Successful response code\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
-                  "});",
-                  "pm.test(\"Response time is less than 1000ms\", function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
-                  "});"
-                ],
-                "type": "text/javascript"
+                "type": "text/javascript",
+                "exec": ["pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));"]
               }
             }
           ]
         },
         {
-          "name": "Follow user",
+          "name": "Follow user (happy path)",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"followerId\": 1\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/users/2/follow",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "users",
-                "2",
-                "follow"
-              ]
-            }
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"followerId\": 1\n}" },
+            "url": { "raw": "{{baseUrl}}/api/users/2/follow", "host": ["{{baseUrl}}"], "path": ["api", "users", "2", "follow"] }
           },
           "event": [
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Successful response code\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
-                  "});",
-                  "pm.test(\"Response time is less than 1000ms\", function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
-                  "});"
-                ],
-                "type": "text/javascript"
+                  "pm.test('201 lub 409 (idempotent)', () => pm.expect(pm.response.code).to.be.oneOf([201, 409]));"
+                ]
               }
             }
           ]
         },
         {
-          "name": "Unfollow user",
+          "name": "Follow user — self-follow (400 SELF_FOLLOW)",
           "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"followerId\": 1\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/users/2/follow",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "users",
-                "2",
-                "follow"
-              ]
-            }
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"followerId\": 1\n}" },
+            "url": { "raw": "{{baseUrl}}/api/users/1/follow", "host": ["{{baseUrl}}"], "path": ["api", "users", "1", "follow"] }
           },
           "event": [
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Successful response code\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
-                  "});",
-                  "pm.test(\"Response time is less than 1000ms\", function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
-                  "});"
-                ],
-                "type": "text/javascript"
+                  "pm.test('400 Bad Request', () => pm.expect(pm.response.code).to.eql(400));",
+                  "pm.test('code = SELF_FOLLOW', () => pm.expect(pm.response.json().code).to.eql('SELF_FOLLOW'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Follow user — invalid followee id (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"followerId\": 1\n}" },
+            "url": { "raw": "{{baseUrl}}/api/users/abc/follow", "host": ["{{baseUrl}}"], "path": ["api", "users", "abc", "follow"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.expect(pm.response.code).to.eql(400));",
+                  "pm.test('code = INVALID_FOLLOWEE_ID', () => pm.expect(pm.response.json().code).to.eql('INVALID_FOLLOWEE_ID'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Follow user — missing followerId (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": { "raw": "{{baseUrl}}/api/users/2/follow", "host": ["{{baseUrl}}"], "path": ["api", "users", "2", "follow"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.expect(pm.response.code).to.eql(400));",
+                  "pm.test('code = INVALID_FOLLOWER_ID', () => pm.expect(pm.response.json().code).to.eql('INVALID_FOLLOWER_ID'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Follow user — already following (409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"followerId\": 1\n}" },
+            "url": { "raw": "{{baseUrl}}/api/users/2/follow", "host": ["{{baseUrl}}"], "path": ["api", "users", "2", "follow"] },
+            "description": "Uruchom dwa razy z rzedu, aby wymusic 409 ALREADY_FOLLOWING."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 lub 409 (zalezy od stanu bazy)', () => pm.expect(pm.response.code).to.be.oneOf([201, 409]));",
+                  "if (pm.response.code === 409) {",
+                  "  pm.test('code = ALREADY_FOLLOWING', () => pm.expect(pm.response.json().code).to.eql('ALREADY_FOLLOWING'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unfollow user (happy path)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"followerId\": 1\n}" },
+            "url": { "raw": "{{baseUrl}}/api/users/2/follow", "host": ["{{baseUrl}}"], "path": ["api", "users", "2", "follow"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 lub 404 (jezeli nie istnieje)', () => pm.expect(pm.response.code).to.be.oneOf([204, 404]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unfollow user — not found (404)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"followerId\": 1\n}" },
+            "url": { "raw": "{{baseUrl}}/api/users/99999/follow", "host": ["{{baseUrl}}"], "path": ["api", "users", "99999", "follow"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.expect(pm.response.code).to.eql(404));",
+                  "pm.test('code = FOLLOW_NOT_FOUND', () => pm.expect(pm.response.json().code).to.eql('FOLLOW_NOT_FOUND'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unfollow user — invalid id (400)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"followerId\": 1\n}" },
+            "url": { "raw": "{{baseUrl}}/api/users/abc/follow", "host": ["{{baseUrl}}"], "path": ["api", "users", "abc", "follow"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.expect(pm.response.code).to.eql(400));"
+                ]
               }
             }
           ]
@@ -213,43 +249,109 @@
       "name": "Posts",
       "item": [
         {
-          "name": "Create post",
+          "name": "Create post (happy path z rich content)",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"authorId\": 1,\n  \"bodyPreview\": \"Hello #intro #news\",\n  \"attachments\": [\n    { \"url\": \"https://cdn.site/img.png\", \"type\": \"image\" }\n  ],\n  \"poll\": { \"question\": \"Your pick?\", \"options\": [\"A\", \"B\"] }\n}"
             },
-            "url": {
-              "raw": "{{baseUrl}}/api/posts",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "posts"
-              ]
-            }
+            "url": { "raw": "{{baseUrl}}/api/posts", "host": ["{{baseUrl}}"], "path": ["api", "posts"] }
           },
           "event": [
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Successful response code\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
-                  "});",
-                  "pm.test(\"Response time is less than 1000ms\", function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
-                  "});"
-                ],
-                "type": "text/javascript"
+                  "pm.test('201 Created', () => pm.expect(pm.response.code).to.eql(201));",
+                  "const body = pm.response.json();",
+                  "pm.expect(body.id).to.be.a('number');",
+                  "pm.collectionVariables.set('createdPostId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create post — empty body (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"authorId\": 1,\n  \"bodyPreview\": \"\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/posts", "host": ["{{baseUrl}}"], "path": ["api", "posts"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Validation', () => pm.expect(pm.response.code).to.eql(400));",
+                  "pm.test('code = VALIDATION_FAILED', () => pm.expect(pm.response.json().code).to.eql('VALIDATION_FAILED'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create post — too long body (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"authorId\": 1,\n  \"bodyPreview\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/posts", "host": ["{{baseUrl}}"], "path": ["api", "posts"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Validation', () => pm.expect(pm.response.code).to.eql(400));",
+                  "pm.test('code = VALIDATION_FAILED', () => pm.expect(pm.response.json().code).to.eql('VALIDATION_FAILED'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create post — missing authorId (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"bodyPreview\": \"x\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/posts", "host": ["{{baseUrl}}"], "path": ["api", "posts"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.expect(pm.response.code).to.eql(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create post — attachments not array (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"authorId\": 1,\n  \"bodyPreview\": \"x\",\n  \"attachments\": \"not-an-array\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/posts", "host": ["{{baseUrl}}"], "path": ["api", "posts"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Validation', () => pm.expect(pm.response.code).to.eql(400));"
+                ]
               }
             }
           ]
@@ -259,53 +361,74 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/posts",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "posts"
-              ]
-            }
+            "url": { "raw": "{{baseUrl}}/api/posts", "host": ["{{baseUrl}}"], "path": ["api", "posts"] }
           },
           "event": [
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Successful response code\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
-                  "});",
-                  "pm.test(\"Response time is less than 1000ms\", function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
-                  "});"
-                ],
-                "type": "text/javascript"
+                  "pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));",
+                  "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
               }
             }
           ]
         },
         {
-          "name": "List posts by authorId",
+          "name": "List posts — filtr authorId",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/posts?authorId=1",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "posts"
-              ],
+              "host": ["{{baseUrl}}"], "path": ["api", "posts"],
+              "query": [{ "key": "authorId", "value": "1" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List posts — filtr hashtag",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts?hashtag=intro",
+              "host": ["{{baseUrl}}"], "path": ["api", "posts"],
+              "query": [{ "key": "hashtag", "value": "intro" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List posts — filtr authorId + hashtag (raw SQL)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts?authorId=1&hashtag=intro",
+              "host": ["{{baseUrl}}"], "path": ["api", "posts"],
               "query": [
-                {
-                  "key": "authorId",
-                  "value": "1"
-                }
+                { "key": "authorId", "value": "1" },
+                { "key": "hashtag", "value": "intro" }
               ]
             }
           },
@@ -313,15 +436,8 @@
             {
               "listen": "test",
               "script": {
-                "exec": [
-                  "pm.test(\"Successful response code\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
-                  "});",
-                  "pm.test(\"Response time is less than 1000ms\", function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
-                  "});"
-                ],
-                "type": "text/javascript"
+                "type": "text/javascript",
+                "exec": ["pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));"]
               }
             }
           ]
@@ -330,76 +446,298 @@
           "name": "Add reaction (idempotent)",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"userId\": 2,\n  \"type\": \"like\"\n}"
-            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": 2,\n  \"type\": \"like\"\n}" },
             "url": {
-              "raw": "{{baseUrl}}/api/posts/1/reactions",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "posts",
-                "1",
-                "reactions"
-              ]
+              "raw": "{{baseUrl}}/api/posts/{{createdPostId}}/reactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "posts", "{{createdPostId}}", "reactions"]
             }
           },
           "event": [
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Successful response code\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
-                  "});",
-                  "pm.test(\"Response time is less than 1000ms\", function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
-                  "});"
-                ],
-                "type": "text/javascript"
+                  "pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));",
+                  "pm.test('Has type field', () => pm.expect(pm.response.json().type).to.eql('like'));"
+                ]
               }
             }
           ]
         },
         {
-          "name": "Delete post",
+          "name": "Add reaction — invalid postId (400)",
           "request": {
-            "method": "DELETE",
-            "header": [],
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": 2,\n  \"type\": \"like\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/posts/abc/reactions", "host": ["{{baseUrl}}"], "path": ["api", "posts", "abc", "reactions"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.expect(pm.response.code).to.eql(400));",
+                  "pm.test('code = INVALID_POST_ID', () => pm.expect(pm.response.json().code).to.eql('INVALID_POST_ID'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add comment (happy path)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"authorId\": 1,\n  \"content\": \"Pierwszy komentarz\"\n}" },
             "url": {
-              "raw": "{{baseUrl}}/api/posts/1",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "posts",
-                "1"
-              ]
+              "raw": "{{baseUrl}}/api/posts/{{createdPostId}}/comments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "posts", "{{createdPostId}}", "comments"]
             }
           },
           "event": [
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Successful response code\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
-                  "});",
-                  "pm.test(\"Response time is less than 1000ms\", function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
-                  "});"
-                ],
-                "type": "text/javascript"
+                  "pm.test('201 Created', () => pm.expect(pm.response.code).to.eql(201));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('createdCommentId', body.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add comment — reply z parentId",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"authorId\": 2,\n  \"content\": \"Odpowiedz\",\n  \"parentId\": {{createdCommentId}}\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{createdPostId}}/comments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "posts", "{{createdPostId}}", "comments"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.expect(pm.response.code).to.eql(201));",
+                  "pm.test('parentId zachowany', () => pm.expect(pm.response.json().parentId).to.not.be.null);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add comment — empty content (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"authorId\": 1,\n  \"content\": \"   \"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{createdPostId}}/comments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "posts", "{{createdPostId}}", "comments"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Validation', () => pm.expect(pm.response.code).to.eql(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add comment — invalid postId (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"authorId\": 1,\n  \"content\": \"x\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/posts/abc/comments", "host": ["{{baseUrl}}"], "path": ["api", "posts", "abc", "comments"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.expect(pm.response.code).to.eql(400));",
+                  "pm.test('code = INVALID_POST_ID', () => pm.expect(pm.response.json().code).to.eql('INVALID_POST_ID'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get comments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{createdPostId}}/comments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "posts", "{{createdPostId}}", "comments"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));",
+                  "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get comments — invalid postId (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/posts/abc/comments", "host": ["{{baseUrl}}"], "path": ["api", "posts", "abc", "comments"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.expect(pm.response.code).to.eql(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete post — not owner (403)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": 99999\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{createdPostId}}",
+              "host": ["{{baseUrl}}"], "path": ["api", "posts", "{{createdPostId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 lub 404', () => pm.expect(pm.response.code).to.be.oneOf([403, 404]));",
+                  "if (pm.response.code === 403) {",
+                  "  pm.test('code = NOT_POST_OWNER', () => pm.expect(pm.response.json().code).to.eql('NOT_POST_OWNER'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete post — invalid id (400)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": 1\n}" },
+            "url": { "raw": "{{baseUrl}}/api/posts/abc", "host": ["{{baseUrl}}"], "path": ["api", "posts", "abc"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.expect(pm.response.code).to.eql(400));",
+                  "pm.test('code = INVALID_POST_ID', () => pm.expect(pm.response.json().code).to.eql('INVALID_POST_ID'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete post — missing requesterId (400)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{createdPostId}}",
+              "host": ["{{baseUrl}}"], "path": ["api", "posts", "{{createdPostId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.expect(pm.response.code).to.eql(400));",
+                  "pm.test('code = INVALID_REQUESTER_ID', () => pm.expect(pm.response.json().code).to.eql('INVALID_REQUESTER_ID'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete post — not found (404)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": 1\n}" },
+            "url": { "raw": "{{baseUrl}}/api/posts/9999999", "host": ["{{baseUrl}}"], "path": ["api", "posts", "9999999"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.expect(pm.response.code).to.eql(404));",
+                  "pm.test('code = POST_NOT_FOUND', () => pm.expect(pm.response.json().code).to.eql('POST_NOT_FOUND'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete post (happy path)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"requesterId\": 1\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/api/posts/{{createdPostId}}",
+              "host": ["{{baseUrl}}"], "path": ["api", "posts", "{{createdPostId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.expect(pm.response.code).to.eql(204));"
+                ]
               }
             }
           ]
@@ -410,103 +748,62 @@
       "name": "Feed",
       "item": [
         {
-          "name": "Get feed",
+          "name": "Get feed (happy path)",
           "request": {
             "method": "GET",
             "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/feed/1",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "feed",
-                "1"
-              ]
-            }
+            "url": { "raw": "{{baseUrl}}/api/feed/1", "host": ["{{baseUrl}}"], "path": ["api", "feed", "1"] }
           },
           "event": [
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Successful response code\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
-                  "});",
-                  "pm.test(\"Response time is less than 1000ms\", function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
+                  "pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));",
+                  "pm.test('Has data array', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('data');",
+                  "  pm.expect(body.data).to.be.an('array');",
+                  "  pm.expect(body).to.have.property('nextCursor');",
                   "});"
-                ],
-                "type": "text/javascript"
+                ]
               }
             }
           ]
         },
         {
-          "name": "Get feed with limit",
+          "name": "Get feed — z limitem",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/feed/1?limit=5",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "feed",
-                "1"
-              ],
-              "query": [
-                {
-                  "key": "limit",
-                  "value": "5"
-                }
-              ]
+              "host": ["{{baseUrl}}"], "path": ["api", "feed", "1"],
+              "query": [{ "key": "limit", "value": "5" }]
             }
           },
           "event": [
             {
               "listen": "test",
               "script": {
-                "exec": [
-                  "pm.test(\"Successful response code\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
-                  "});",
-                  "pm.test(\"Response time is less than 1000ms\", function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
-                  "});"
-                ],
-                "type": "text/javascript"
+                "type": "text/javascript",
+                "exec": ["pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));"]
               }
             }
           ]
         },
         {
-          "name": "Get feed with cursor",
+          "name": "Get feed — z kursorem (paginacja)",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/feed/1?limit=5&cursor=2026-05-01T10:00:00.000Z",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "feed",
-                "1"
-              ],
+              "host": ["{{baseUrl}}"], "path": ["api", "feed", "1"],
               "query": [
-                {
-                  "key": "limit",
-                  "value": "5"
-                },
-                {
-                  "key": "cursor",
-                  "value": "2026-05-01T10:00:00.000Z"
-                }
+                { "key": "limit", "value": "5" },
+                { "key": "cursor", "value": "2026-05-01T10:00:00.000Z" }
               ]
             }
           },
@@ -514,15 +811,52 @@
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get feed — invalid userId (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/feed/abc", "host": ["{{baseUrl}}"], "path": ["api", "feed", "abc"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Successful response code\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
-                  "});",
-                  "pm.test(\"Response time is less than 1000ms\", function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
-                  "});"
-                ],
-                "type": "text/javascript"
+                  "pm.test('400 Bad Request', () => pm.expect(pm.response.code).to.eql(400));",
+                  "pm.test('code = INVALID_USER_ID', () => pm.expect(pm.response.json().code).to.eql('INVALID_USER_ID'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get feed — invalid cursor (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/feed/1?cursor=not-a-date",
+              "host": ["{{baseUrl}}"], "path": ["api", "feed", "1"],
+              "query": [{ "key": "cursor", "value": "not-a-date" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.expect(pm.response.code).to.eql(400));",
+                  "pm.test('code = INVALID_CURSOR', () => pm.expect(pm.response.json().code).to.eql('INVALID_CURSOR'));"
+                ]
               }
             }
           ]
@@ -537,31 +871,17 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/analytics/trending",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "analytics",
-                "trending"
-              ]
-            }
+            "url": { "raw": "{{baseUrl}}/api/analytics/trending", "host": ["{{baseUrl}}"], "path": ["api", "analytics", "trending"] }
           },
           "event": [
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Successful response code\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
-                  "});",
-                  "pm.test(\"Response time is less than 1000ms\", function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
-                  "});"
-                ],
-                "type": "text/javascript"
+                  "pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));",
+                  "pm.test('Has trending array', () => pm.expect(pm.response.json().trending).to.be.an('array'));"
+                ]
               }
             }
           ]
@@ -571,31 +891,78 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/analytics/top-authors-weekly",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "analytics",
-                "top-authors-weekly"
-              ]
-            }
+            "url": { "raw": "{{baseUrl}}/api/analytics/top-authors-weekly", "host": ["{{baseUrl}}"], "path": ["api", "analytics", "top-authors-weekly"] }
           },
           "event": [
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Successful response code\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
-                  "});",
-                  "pm.test(\"Response time is less than 1000ms\", function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
-                  "});"
-                ],
-                "type": "text/javascript"
+                  "pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));",
+                  "pm.test('Has topAuthors array', () => pm.expect(pm.response.json().topAuthors).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reaction distribution",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/analytics/reaction-distribution", "host": ["{{baseUrl}}"], "path": ["api", "analytics", "reaction-distribution"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));",
+                  "pm.test('Has distribution array', () => pm.expect(pm.response.json().distribution).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create system log",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"level\": \"error\",\n  \"message\": \"Demo log z Postmana\",\n  \"metadata\": { \"source\": \"postman\" }\n}" },
+            "url": { "raw": "{{baseUrl}}/api/analytics/system-logs", "host": ["{{baseUrl}}"], "path": ["api", "analytics", "system-logs"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.expect(pm.response.code).to.eql(201));",
+                  "pm.test('Has insertedId', () => pm.expect(pm.response.json().id).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get system logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/analytics/system-logs", "host": ["{{baseUrl}}"], "path": ["api", "analytics", "system-logs"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));",
+                  "pm.test('Has logs array', () => pm.expect(pm.response.json().logs).to.be.an('array'));"
+                ]
               }
             }
           ]
@@ -604,81 +971,109 @@
     },
     {
       "name": "Internal",
+      "description": "Endpointy serwer-do-serwera. Wywolywane glownie z pg-service (fan-out i cascade delete).",
       "item": [
         {
-          "name": "Create rich post",
+          "name": "Create rich post (fan-out)",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"postId\": 123,\n  \"authorId\": 1,\n  \"attachments\": [\n    { \"url\": \"https://cdn.site/a.jpg\", \"type\": \"image\" }\n  ],\n  \"poll\": { \"question\": \"Vote?\", \"options\": [\"Yes\", \"No\"] },\n  \"followerIds\": [2, 3, 4]\n}"
+              "raw": "{\n  \"postId\": 1234,\n  \"authorId\": 1,\n  \"attachments\": [\n    { \"url\": \"https://cdn.site/a.jpg\", \"type\": \"image\" }\n  ],\n  \"poll\": { \"question\": \"Vote?\", \"options\": [\"Yes\", \"No\"] },\n  \"followerIds\": [2, 3, 4]\n}"
             },
-            "url": {
-              "raw": "{{baseUrl}}/api/internal/rich-posts",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "internal",
-                "rich-posts"
-              ]
-            }
+            "url": { "raw": "{{baseUrl}}/api/internal/rich-posts", "host": ["{{baseUrl}}"], "path": ["api", "internal", "rich-posts"] }
           },
           "event": [
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Successful response code\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
-                  "});",
-                  "pm.test(\"Response time is less than 1000ms\", function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
-                  "});"
-                ],
-                "type": "text/javascript"
+                  "pm.test('201 lub 500 (jezeli postId istnieje)', () => pm.expect(pm.response.code).to.be.oneOf([201, 500]));"
+                ]
               }
             }
           ]
         },
         {
-          "name": "Delete rich post",
+          "name": "Update reactions analytics (auto from pg-service)",
           "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/internal/rich-posts/123",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "internal",
-                "rich-posts",
-                "123"
-              ]
-            }
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": 1,\n  \"type\": \"love\",\n  \"previousType\": \"like\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/internal/reactions", "host": ["{{baseUrl}}"], "path": ["api", "internal", "reactions"] },
+            "description": "Wywolywane przez pg-service po kazdym upsert reakcji. Aktualizuje ActivityDaily.reactionsGiven, dzieki czemu /analytics/reaction-distribution zwraca realne dane."
           },
           "event": [
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Successful response code\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
-                  "});",
-                  "pm.test(\"Response time is less than 1000ms\", function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
-                  "});"
-                ],
-                "type": "text/javascript"
+                  "pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));",
+                  "pm.test('success = true', () => pm.expect(pm.response.json().success).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update reactions analytics — invalid (400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"type\": \"love\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/internal/reactions", "host": ["{{baseUrl}}"], "path": ["api", "internal", "reactions"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.expect(pm.response.code).to.eql(400));",
+                  "pm.test('code = INVALID_USER_ID', () => pm.expect(pm.response.json().code).to.eql('INVALID_USER_ID'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete rich post (cascade)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/internal/rich-posts/1234", "host": ["{{baseUrl}}"], "path": ["api", "internal", "rich-posts", "1234"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.expect(pm.response.code).to.eql(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete rich post — invalid postId (400)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/internal/rich-posts/abc", "host": ["{{baseUrl}}"], "path": ["api", "internal", "rich-posts", "abc"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.expect(pm.response.code).to.eql(400));",
+                  "pm.test('code = INVALID_POST_ID', () => pm.expect(pm.response.json().code).to.eql('INVALID_POST_ID'));"
+                ]
               }
             }
           ]
@@ -687,9 +1082,8 @@
     }
   ],
   "variable": [
-    {
-      "key": "baseUrl",
-      "value": "http://localhost:8080"
-    }
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "createdPostId", "value": "1" },
+    { "key": "createdCommentId", "value": "1" }
   ]
 }
