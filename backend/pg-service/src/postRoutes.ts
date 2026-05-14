@@ -146,12 +146,30 @@ router.post('/:id/reactions', async (req: Request, res: Response, next: NextFunc
   const { userId, type } = req.body;
 
   try {
+    // Sprawdzamy poprzedni typ, zeby poinformowac mongo (analytics) co zdekrementowac.
+    const existing = await prisma.reaction.findUnique({
+      where: { postId_userId: { postId, userId } },
+      select: { type: true }
+    });
+    const previousType = existing?.type ?? null;
+
     // upsert gwarantuje idempotentność - jeśli istnieje, zaktualizuje, jeśli nie - stworzy.
     const reaction = await prisma.reaction.upsert({
       where: { postId_userId: { postId, userId } },
       update: { type },
       create: { postId, userId, type }
     });
+
+    // Powiadom mongo, zeby reaction-distribution mial realne dane.
+    // Fire-and-forget — blad analytics nie psuje zwroconej reakcji.
+    if (previousType !== type) {
+      fetch(`${MONGO_SERVICE_URL}/api/internal/reactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, type, previousType })
+      }).catch(err => console.error(`Blad notyfikacji reaction analytics (post ${postId}):`, err));
+    }
+
     res.json(reaction);
   } catch (error) { next(error); }
 });

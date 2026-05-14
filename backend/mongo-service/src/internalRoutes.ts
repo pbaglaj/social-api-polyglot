@@ -48,6 +48,55 @@ router.post('/rich-posts', async (req: Request, res: Response): Promise<any> => 
   }
 });
 
+// Aktualizacja mapy reactionsGiven w ActivityDaily — wywolywane z pg-service
+// po kazdej operacji upsert na Reaction. Pozwala endpointowi /analytics/reaction-distribution
+// zwracac realne dane (wczesniej pole bylo wiecznie puste).
+router.post('/reactions', async (req: Request, res: Response): Promise<any> => {
+  const { userId, type, previousType } = req.body;
+
+  if (typeof userId !== 'number' || !Number.isInteger(userId)) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      code: 'INVALID_USER_ID',
+      details: 'userId musi byc liczba calkowita.'
+    });
+  }
+
+  if (typeof type !== 'string' || !type.trim()) {
+    return res.status(400).json({
+      error: 'Validation Error',
+      code: 'INVALID_TYPE',
+      details: 'type musi byc niepustym stringiem.'
+    });
+  }
+
+  try {
+    const day = new Date();
+    day.setUTCHours(0, 0, 0, 0);
+
+    const inc: Record<string, number> = { [`reactionsGiven.${type}`]: 1 };
+    if (typeof previousType === 'string' && previousType.trim() && previousType !== type) {
+      inc[`reactionsGiven.${previousType}`] = -1;
+    }
+
+    await ActivityDaily.updateOne(
+      { day, authorId: userId },
+      { $inc: inc, $set: { updatedAt: new Date() } },
+      { upsert: true }
+    );
+
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Blad aktualizacji ActivityDaily.reactionsGiven:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      code: 'REACTION_UPDATE_FAILED',
+      details: message
+    });
+  }
+});
+
 // Wymóg T18: Kaskadowe usuwanie wpisów z feedu i rich posts
 router.delete('/rich-posts/:postId', async (req: Request, res: Response): Promise<any> => {
   const postIdParam = Array.isArray(req.params.postId) ? req.params.postId[0] : req.params.postId;
