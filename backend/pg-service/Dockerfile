@@ -18,8 +18,10 @@ RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/src ./src
+COPY --from=builder /app/knex ./knex
+COPY knexfile.cjs ./
 COPY tsconfig.json ./
 # Prisma wymaga klienta w środowisku produkcyjnym
-RUN npx prisma generate 
+RUN npx prisma generate
 
-CMD ["node", "dist/src/index.js"]
+CMD ["npx", "tsx", "src/index.ts"]

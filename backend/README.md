@@ -28,7 +28,11 @@ Projekt wymaga m.in. sparametryzowania portów i kluczy połączeniowych do baz.
 
 Projekt oparty jest na architekturze mikroserwisowej podzielonej odpowiedzialnościami za typ bazy danych:
 
-* **pg-service** (Baza: PostgreSQL): Serwis zarządzający wysoce relacyjnymi i kanonicznymi danymi — profilami użytkowników, obserwowaniem (follower/followee), podstawowymi rekordami postów, komentarzami. Odpowiada za integralność logiki biznesowej zachowując reguły ACID.
+* **pg-service** (Baza: PostgreSQL): Serwis zarządzający wysoce relacyjnymi i kanonicznymi danymi — profilami użytkowników, obserwowaniem (follower/followee), podstawowymi rekordami postów, komentarzami. Odpowiada za integralność logiki biznesowej zachowując reguły ACID. Wewnątrz tego serwisu wykorzystywane są **cztery niezależne narzędzia** do PostgreSQL, zgodnie z wymaganiami T1-T4:
+  * **`pg` (sterownik natywny)** — endpointy `/api/stats/*` (parametryzowane $1/$2, pula singleton, SIGINT graceful shutdown).
+  * **`Knex.js`** — endpointy `/api/tags/*` (Query Builder z dynamicznym WHERE, dwie addytywne migracje + seed w `pg-service/knex/`).
+  * **`Sequelize v6`** — endpointy `/api/notifications/*` (modele `Notification`, `NotificationType` z walidatorami niestandardowymi, hookiem `beforeCreate`, managed transaction, eager loading przez `include`).
+  * **`Prisma`** — endpointy `/api/posts/*`, `/api/users/*` (główny ORM dla User/Post/Follow/Comment/Reaction, migracje w `prisma/migrations/`).
 * **mongo-service** (Baza: MongoDB): Odpowiada za silnie zdenormalizowany model. Przechowuje feed (strumień aktywności użytkownika w postaci logu rozdzielonego podczas fan-out), obiekty bogate/rozszerzone takie jak embedy, a także agregacje (dzienne statystyki, top trendy).
 * **api-gateway**: Reverse proxy (np. NGINX) obsługujący ruch zewnętrzny. Trasuje wywołania REST API odpowiednio do serwisu PG lub Mongo, bazując na schemacie ścieżek kontrolerów i endpointów.
 

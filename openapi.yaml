@@ -251,6 +251,244 @@ paths:
                       attachments: []
                       poll: null
                 nextCursor: "2026-05-08T12:00:00.000Z"
+  /stats/user/{id}:
+    get:
+      summary: T1 - Statystyki użytkownika (pg native, parametryzowane $1)
+      description: Endpoint korzystający z natywnego sterownika pg (Pool singleton, query $1).
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              example:
+                user:
+                  id: 1
+                  username: "alice"
+                  email: "a@x.pl"
+                  created_at: "2026-05-08T12:00:00.000Z"
+                stats:
+                  postsCount: 3
+                  followersCount: 5
+                  followingCount: 7
+                  reactionsReceived: 11
+        '400':
+          description: Niepoprawny ID
+        '404':
+          description: Użytkownik nie istnieje
+  /stats/posts/top:
+    get:
+      summary: T1 - Top posty (pg native, $1 + $2)
+      parameters:
+        - in: query
+          name: since
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: OK
+  /tags:
+    get:
+      summary: T2 - Lista tagów z dynamicznym WHERE (Knex Query Builder)
+      parameters:
+        - in: query
+          name: name
+          schema:
+            type: string
+        - in: query
+          name: minUsage
+          schema:
+            type: integer
+        - in: query
+          name: createdBefore
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [usage_count, name]
+        - in: query
+          name: order
+          schema:
+            type: string
+            enum: [asc, desc]
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              example:
+                count: 2
+                tags:
+                  - id: 1
+                    name: "tech"
+                    description: "Technologia, programowanie, narzędzia."
+                    usageCount: 10
+                    createdAt: "2026-05-14T12:00:00.000Z"
+    post:
+      summary: T2 - Utworzenie tagu
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  example: "tech"
+                description:
+                  type: string
+                  example: "Technologia"
+      responses:
+        '201':
+          description: Utworzono
+  /tags/attach:
+    post:
+      summary: T2 - Przypisanie tagu do postu (transakcja Knex)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [postId, tagName]
+              properties:
+                postId:
+                  type: integer
+                  example: 1
+                tagName:
+                  type: string
+                  example: "tech"
+      responses:
+        '201':
+          description: Przypisano
+  /tags/{name}/posts:
+    get:
+      summary: T2 - Posty z danym tagiem (JOIN w Knex)
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /notifications/{userId}:
+    get:
+      summary: T3 - Lista powiadomień użytkownika (Sequelize eager loading)
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: unread
+          schema:
+            type: boolean
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              example:
+                count: 1
+                notifications:
+                  - id: 5
+                    userId: 1
+                    typeId: 2
+                    message: "Ktoś polubił Twój post"
+                    isRead: false
+                    type:
+                      id: 2
+                      name: "reaction"
+                      icon: "❤️"
+                      priority: 4
+  /notifications:
+    post:
+      summary: T3 - Utworzenie powiadomienia (walidatory Sequelize, hook beforeCreate)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, typeName, message]
+              properties:
+                userId:
+                  type: integer
+                  example: 1
+                typeName:
+                  type: string
+                  enum: [follow, reaction, comment, mention]
+                  example: "follow"
+                message:
+                  type: string
+                  example: "Nowy obserwator"
+                relatedPostId:
+                  type: integer
+                  nullable: true
+      responses:
+        '201':
+          description: Utworzono
+        '400':
+          description: Walidacja Sequelize
+        '404':
+          description: Typ powiadomienia nie istnieje
+  /notifications/{userId}/read-all:
+    patch:
+      summary: T3 - Oznacz wszystkie powiadomienia jako przeczytane (managed transaction)
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              example:
+                markedAsRead: 7
+  /notifications/{id}:
+    delete:
+      summary: T3 - Usuń powiadomienie
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Usunięto
+        '404':
+          description: Nie znaleziono
   /analytics/top-authors-weekly:
     get:
       summary: Analiza MongoDB pobierająca najlepszych autorów z tego tygodnia (Aggregation Pipeline)

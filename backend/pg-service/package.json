@@ -23,12 +23,16 @@
     "@prisma/client": "^6.6.0",
     "express": "^5.2.1",
     "express-rate-limit": "^8.4.1",
+    "knex": "^3.1.0",
+    "pg": "^8.13.1",
+    "sequelize": "^6.37.5",
     "tsx": "^4.21.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.6.0",
+    "@types/pg": "^8.11.10",
     "@types/supertest": "^7.2.0",
     "cross-env": "^10.1.0",
     "jest": "^30.3.0",

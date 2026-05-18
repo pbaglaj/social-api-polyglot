@@ -5,27 +5,49 @@
 
 ---
 
-## T1 — Pula połączeń, zapytania parametryzowane, mapowanie błędów PostgreSQL
+## T1 — Sterownik `pg`: Pula połączeń, zapytania parametryzowane, mapowanie błędów PostgreSQL
 
 **Wymaganie:**
-Pula połączeń singleton, zapytania parametryzowane ($1, $2), mapowanie kodów PostgreSQL (np. 23505, 23503) na HTTP.
+Pula połączeń singleton (sterownik `pg`), zapytania parametryzowane ($1, $2), mapowanie kodów PostgreSQL (np. 23505, 23503) na HTTP.
 
 **Co to znaczy:**
-- **Singleton** — jedna instancja klienta bazy danych dla całego procesu Node.js (nie tworzymy nowego połączenia na każde żądanie HTTP).
+- **Singleton** — jedna instancja `pg.Pool` dla całego procesu Node.js (nie tworzymy nowego połączenia na każde żądanie HTTP).
 - **Parametryzowane zapytania** — zamiast sklejać SQL ze stringów (`"WHERE id=" + userId`), używamy placeholderów (`$1`, `$2`), co chroni przed SQL Injection.
 - **Mapowanie błędów** — PostgreSQL zwraca kody błędów (np. `23505` = naruszenie UNIQUE), które tłumaczymy na kody HTTP (409 Conflict, 400 Bad Request, itp.).
 
 **Implementacja:**
 
-Singleton Prisma Client — [backend/pg-service/src/db.ts](backend/pg-service/src/db.ts):
+Pula `pg.Pool` singleton + SIGINT — [backend/pg-service/src/pgPool.ts](backend/pg-service/src/pgPool.ts):
 ```typescript
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClientSingleton };
-if (!globalForPrisma.prisma) globalForPrisma.prisma = prismaClientSingleton();
-export default globalForPrisma.prisma;
-```
-Prisma przechowuje instancję na `globalThis` — przy hot-reload (nodemon) nie tworzymy dziesiątek połączeń. Wbudowany connection pool jest konfigurowalny przez `?connection_limit=X` w DATABASE_URL.
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: Number(process.env.PG_POOL_MAX || 10),
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+});
 
-Parametryzowane zapytania — Prisma automatycznie buduje `$1, $2` w tle. Dla surowego SQL używamy tagged template (`$queryRaw`), który nigdy nie sklejał stringów.
+process.on('SIGINT', async () => { await pool.end(); });
+```
+
+Endpointy oparte natywnie na `pg` — [backend/pg-service/src/statsRoutes.ts](backend/pg-service/src/statsRoutes.ts):
+```typescript
+// GET /api/stats/user/:id — pojedyncze parametryzowane zapytanie z $1.
+await pgPool.query(
+  'SELECT id, username, email, "createdAt" FROM "User" WHERE id = $1',
+  [userId]
+);
+
+// GET /api/stats/posts/top — dwa parametry $1 (data), $2 (limit).
+await pgPool.query(
+  `SELECT p.id, p."bodyPreview", p."authorId", COUNT(r.id)::int AS reactions_count
+     FROM "Post" p LEFT JOIN "Reaction" r ON r."postId" = p.id
+    WHERE p."createdAt" >= $1
+    GROUP BY p.id
+    ORDER BY reactions_count DESC, p."createdAt" DESC
+    LIMIT $2`,
+  [sinceDate, limit]
+);
+```
 
 Mapowanie błędów PostgreSQL — [backend/pg-service/src/errorHandler.ts](backend/pg-service/src/errorHandler.ts):
 ```typescript
@@ -53,37 +75,61 @@ if (err instanceof PrismaClientKnownRequestError) {
 
 ---
 
-## T2 — Migracje, seedy, dynamiczne WHERE bez sklejania stringów
+## T2 — Knex.js: migracje, seedy, dynamiczne WHERE bez sklejania stringów
 
 **Wymaganie:**
-Schemat wyłącznie przez migracje (min. 2 addytywne), seedy domenowe, min. 1 endpoint z dynamicznym WHERE bez sklejania SQL z stringów.
+Schemat wyłącznie przez migracje Knex (min. 2 addytywne), seedy domenowe, min. 1 endpoint z dynamicznym WHERE bez sklejania SQL z stringów.
 
 **Co to znaczy:**
-- **Migracje** — historia zmian schematu bazy. Każda migracja to plik SQL, który można odtworzyć na czystej bazie. Addytywna = tylko dodaje kolumny/tabele, nie usuwa.
-- **Seedy** — skrypt wypełniający bazę przykładowymi danymi domenowymi (użytkownicy, posty, follows) na potrzeby developmentu/prezentacji.
-- **Dynamiczne WHERE** — filtrowanie wyników bez sklejania stringów SQL.
+- **Migracje Knex** — historia zmian schematu bazy. Każda migracja to plik TypeScript z `up`/`down`, który można odtworzyć na czystej bazie. Addytywna = tylko dodaje tabele/kolumny.
+- **Seedy** — skrypt wypełniający bazę przykładowymi danymi domenowymi.
+- **Dynamiczne WHERE** — filtrowanie wyników bez sklejania stringów SQL — Knex Query Builder dorzuca `.where()`/`.andWhere()` w zależności od parametrów.
 
 **Implementacja:**
 
-Trzy migracje Prisma — [backend/pg-service/prisma/migrations/](backend/pg-service/prisma/migrations/):
+Konfiguracja — [backend/pg-service/knexfile.ts](backend/pg-service/knexfile.ts), singleton — [backend/pg-service/src/knex.ts](backend/pg-service/src/knex.ts).
 
-1. `20260426180006_init` — tabele bazowe: User, Follow, Post, Comment, Reaction
-2. `20260505183000_cascade_post_deletes` — addytywna: dodanie `ON DELETE CASCADE` do FK w Comment i Reaction
-3. `20260513120000_add_user_profile_fields` — addytywna: nowe kolumny w User (`bio`, `avatarUrl`, `displayName`, `location`, `isVerified`, `updatedAt`)
+Dwie addytywne migracje Knex — [backend/pg-service/knex/migrations/](backend/pg-service/knex/migrations/):
 
-Seed domenowy — [backend/pg-service/prisma/seed.ts](backend/pg-service/prisma/seed.ts):
-Tworzy 10 użytkowników (faker), dla każdego: 1 post, 1 komentarz, 1 relację follow.
+1. `20260514120000_create_tags.ts` — tabela `tags` (id, name UNIQUE, description, usage_count, created_at) + indeks na `usage_count DESC`.
+2. `20260514120100_create_post_tags.ts` — tabela łącząca `post_tags` (post_id, tag_id, UNIQUE razem) z FK do `"Post"` (CASCADE) i `tags`.
 
-Dynamiczne WHERE bez sklejania stringów — [backend/pg-service/src/postRoutes.ts](backend/pg-service/src/postRoutes.ts):
+Seed Knex — [backend/pg-service/knex/seeds/01_tags.ts](backend/pg-service/knex/seeds/01_tags.ts):
+Tworzy 8 kanonicznych tagów: `tech`, `news`, `sport`, `music`, `travel`, `food`, `gaming`, `photography`.
+
+Dynamiczne WHERE bez sklejania stringów — [backend/pg-service/src/tagsRoutes.ts](backend/pg-service/src/tagsRoutes.ts):
 ```typescript
-// GET /api/posts?authorId=5&hashtag=tech
-const where: Prisma.PostWhereInput = {};
-if (authorId)  where.authorId = Number(authorId);
-if (hashtag)   where.bodyPreview = { contains: `#${hashtag}`, mode: 'insensitive' };
+// GET /api/tags?name=tech&minUsage=5&createdBefore=2026-05-14&sortBy=usage_count&order=desc
+const query = knex('tags').select('id', 'name', 'description',
+                                  'usage_count as usageCount', 'created_at as createdAt');
 
-const posts = await prisma.post.findMany({ where, include: { author: true } });
+if (name)               query.whereILike('name', `%${name}%`);
+if (minUsage !== null)  query.andWhere('usage_count', '>=', minUsage);
+if (createdBefore)      query.andWhere('created_at', '<', new Date(createdBefore));
+
+query.orderBy(sortBy, order).limit(limit);
 ```
-Prisma buduje parametryzowany SQL bez żadnego sklejania stringów.
+
+Transakcja Knex przy `POST /api/tags/attach`:
+```typescript
+await knex.transaction(async (trx) => {
+  let tag = await trx('tags').where({ name }).first();
+  if (!tag) tag = (await trx('tags').insert({ name }).returning(['id', 'name']))[0];
+  await trx('post_tags').insert({ post_id: pid, tag_id: tag.id })
+                        .onConflict(['post_id', 'tag_id']).ignore();
+  await trx('tags').where({ id: tag.id }).increment('usage_count', 1);
+});
+```
+
+Uruchamianie migracji w compose:
+```yaml
+command: >
+  sh -c "npx prisma migrate deploy
+         && npx knex migrate:latest --knexfile knexfile.ts
+         && npx prisma db seed
+         && npx knex seed:run --knexfile knexfile.ts
+         && npx tsx src/index.ts"
+```
 
 **Pytania potencjalne:**
 - *"Jak uruchomić migracje na czystej bazie?"* — `npx prisma migrate deploy` (działa automatycznie w docker-compose).
@@ -92,55 +138,94 @@ Prisma buduje parametryzowany SQL bez żadnego sklejania stringów.
 
 ---
 
-## T3 — Modele Prisma z walidacją, relacje, eager loading, hook, transakcja
+## T3 — Sequelize v6: modele z walidacją, relacje, eager loading, hook, transakcja
 
 **Wymaganie:**
-Min. 2 modele z walidacją, relacje użyte w endpointach, eager loading (include), hook domenowy, transakcja zarządzana.
+Min. 2 modele Sequelize z walidatorami niestandardowymi, relacje użyte w endpointach, eager loading (`include`), hook domenowy, transakcja zarządzana.
 
 **Co to znaczy:**
 - **Eager loading** — pobieranie powiązanych danych w jednym zapytaniu (zamiast N+1 queries).
 - **Hook domenowy** — logika automatycznie wykonywana przed/po operacji na modelu (np. normalizacja danych).
-- **Transakcja zarządzana** — blok kodu gdzie albo wszystkie operacje się powiodą, albo żadna (ACID).
+- **Transakcja zarządzana** — `sequelize.transaction(async (t) => ...)` z auto-COMMIT/ROLLBACK.
 
 **Implementacja:**
 
-Dwa modele: `Post` i `User` (+ `Follow`, `Comment`, `Reaction`) — [backend/pg-service/prisma/schema.prisma](backend/pg-service/prisma/schema.prisma).
+Singleton + modele — [backend/pg-service/src/sequelize.ts](backend/pg-service/src/sequelize.ts):
 
-Relacje w endpointach — eager loading przez `include`:
+**Model 1: `NotificationType`** — walidatory `len`, `isLowercase`, niestandardowy `isInRange` (0-10):
 ```typescript
-// GET /api/posts — dołącza dane autora
-const posts = await prisma.post.findMany({
+priority: {
+  type: DataTypes.INTEGER, allowNull: false, defaultValue: 5,
+  validate: {
+    isInRange(value: number) {
+      if (!Number.isInteger(value) || value < 0 || value > 10)
+        throw new Error('priority musi być liczbą całkowitą w zakresie 0-10.');
+    }
+  }
+}
+```
+
+**Model 2: `Notification`** — walidatory `notEmpty`, `len` (1-280), niestandardowy `noScript`:
+```typescript
+message: {
+  type: DataTypes.STRING(280), allowNull: false,
+  validate: {
+    notEmpty: { msg: 'message nie może być pusty.' },
+    len: { args: [1, 280], msg: 'message musi mieć 1-280 znaków.' },
+    noScript(value: string) {
+      if (/<script/i.test(value)) throw new Error('message nie może zawierać tagów <script>.');
+    }
+  }
+}
+```
+
+**Hook domenowy** (`beforeCreate` + `beforeBulkCreate`) — normalizuje whitespace w `message`:
+```typescript
+hooks: {
+  beforeCreate(notification) {
+    notification.message = notification.message.trim().replace(/\s+/g, ' ');
+  }
+}
+```
+
+**Relacja + static method**:
+```typescript
+Notification.belongsTo(NotificationType, { foreignKey: 'typeId', as: 'type' });
+NotificationType.hasMany(Notification, { foreignKey: 'typeId', as: 'notifications' });
+
+(Notification as any).markAllAsRead = async (userId: number) => { /* ... */ };
+```
+
+**Eager loading przez `include`** — [backend/pg-service/src/notificationsRoutes.ts](backend/pg-service/src/notificationsRoutes.ts):
+```typescript
+// GET /api/notifications/:userId
+const notifications = await Notification.findAll({
   where,
-  include: { author: { select: { id: true, username: true } } },
-  orderBy: { createdAt: 'desc' },
-  take: limit
+  include: [{ model: NotificationType, as: 'type' }],
+  order: [['createdAt', 'DESC']],
+  limit,
 });
 ```
 
-Hook domenowy (Client Extension) — [backend/pg-service/src/db.ts](backend/pg-service/src/db.ts):
+**Transakcja zarządzana** — `PATCH /api/notifications/:userId/read-all`:
 ```typescript
-const extended = base.$extends({
-  query: {
-    user: {
-      async create({ args, query }) {
-        // Hook: normalizuj email do lowercase przed zapisem
-        if (args?.data?.email) args.data.email = String(args.data.email).toLowerCase();
-        return query(args);
-      },
-    },
-  },
-});
-```
+const result = await sequelize.transaction(async (t) => {
+  const [updated] = await Notification.update(
+    { isRead: true },
+    { where: { userId, isRead: false }, transaction: t }
+  );
 
-Transakcja zarządzana — DELETE /api/posts/:id — [backend/pg-service/src/postRoutes.ts](backend/pg-service/src/postRoutes.ts):
-```typescript
-await prisma.$transaction(async (tx) => {
-  await tx.comment.deleteMany({ where: { postId } });
-  await tx.reaction.deleteMany({ where: { postId } });
-  await tx.post.delete({ where: { id: postId } });
+  const mentionType = await NotificationType.findOne({ where: { name: 'mention' }, transaction: t });
+  if (mentionType && updated > 0) {
+    await Notification.create(
+      { userId, typeId: mentionType.id, message: `Oznaczono ${updated} ...`, isRead: true },
+      { transaction: t }
+    );
+  }
+  return updated;
 });
 ```
-`$transaction` używa callback pattern — Prisma automatycznie zarządza `BEGIN`/`COMMIT`/`ROLLBACK`.
+Managed transaction automatycznie wykonuje `BEGIN`/`COMMIT`, lub `ROLLBACK` przy rzuconym wyjątku.
 
 **Pytania potencjalne:**
 - *"Co to jest N+1 problem i jak go rozwiązuje eager loading?"* — Bez `include`: 1 query na posty + N queries na autorów. Z `include`: 1 query JOIN.

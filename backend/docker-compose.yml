@@ -43,9 +43,15 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    # T9: Migracje i seedy z compose, odpalane przed startem aplikacji
-    # command: sh -c "npx prisma migrate deploy && npx prisma db seed && node dist/src/index.js"
-    command: sh -c "npx prisma migrate deploy && npx prisma db seed && npx tsx src/index.ts"
+    # T9: Migracje (Prisma + Knex) i seedy z compose, odpalane przed startem aplikacji.
+    # Kolejność: 1) Prisma migrate deploy (tworzy User/Post/...), 2) Knex migrate latest (dodaje tags/post_tags),
+    #            3) Prisma seed, 4) Knex seed, 5) Start serwera (Sequelize sync robi się w runtime).
+    command: >
+      sh -c "npx prisma migrate deploy
+      && npx knex migrate:latest --knexfile knexfile.cjs
+      && npx prisma db seed
+      && npx knex seed:run --knexfile knexfile.cjs
+      && npx tsx src/index.ts"
   mongo-service:
     build:
       context: ./mongo-service

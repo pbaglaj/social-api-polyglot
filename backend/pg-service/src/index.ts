@@ -2,7 +2,11 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import postRoutes from './postRoutes.js';
 import userRoutes from './userRoutes.js';
+import statsRoutes from './statsRoutes.js';
+import tagsRoutes from './tagsRoutes.js';
+import notificationsRoutes from './notificationsRoutes.js';
 import { errorHandler } from './errorHandler.js';
+import { initSequelize } from './sequelize.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -25,8 +29,19 @@ app.use('/api', apiLimiter);
 
 app.use('/api/posts', postRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/stats', statsRoutes);
+app.use('/api/tags', tagsRoutes);
+app.use('/api/notifications', notificationsRoutes);
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`PG Service is running on port ${PORT}`);
-});
+(async () => {
+  try {
+    await initSequelize();
+  } catch (e) {
+    console.error('[sequelize] błąd inicjalizacji modeli:', e);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`PG Service is running on port ${PORT}`);
+  });
+})();
