@@ -17,8 +17,9 @@ function createKnex(): Knex {
 }
 
 // Proxy: leniwe utworzenie instancji Knex.
+// Target MUSI być funkcją, żeby `apply`-trap (np. `knex('tags')`) zadziałał.
 const knex = new Proxy(
-  {},
+  function () {} as unknown as Knex,
   {
     get(_target, prop) {
       if (!globalForKnex.knex) {
