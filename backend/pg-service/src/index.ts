@@ -5,8 +5,12 @@ import userRoutes from './routes/userRoutes.js';
 import statsRoutes from './routes/statsRoutes.js';
 import tagsRoutes from './routes/tagsRoutes.js';
 import notificationsRoutes from './routes/notificationsRoutes.js';
+import healthRoutes from './routes/healthRoutes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { initSequelize } from './models/index.js';
+import prisma from './config/prisma.js';
+import sequelize from './config/sequelize.js';
+import { closeRedis } from './config/redis.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -24,6 +28,8 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+app.use('/health', healthRoutes);
+
 app.use('/api', apiLimiter);
 
 app.use('/api/posts', postRoutes);
@@ -40,7 +46,29 @@ app.use(errorHandler);
     console.error('[sequelize] błąd inicjalizacji modeli:', e);
   }
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`PG Service is running on port ${PORT}`);
   });
+
+  const shutdown = async (signal: string) => {
+    console.log(`[shutdown] received ${signal}, closing connections...`);
+    const closeTimeout = setTimeout(() => {
+      console.error('[shutdown] forced exit after 25s');
+      process.exit(1);
+    }, 25_000);
+
+    server.close(() => console.log('[shutdown] HTTP server closed'));
+
+    await Promise.allSettled([
+      prisma.$disconnect().then(() => console.log('[shutdown] Prisma disconnected')),
+      sequelize.close().then(() => console.log('[shutdown] Sequelize closed')),
+      closeRedis().then(() => console.log('[shutdown] Redis closed')),
+    ]);
+
+    clearTimeout(closeTimeout);
+    process.exit(0);
+  };
+
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  process.on('SIGINT', () => void shutdown('SIGINT'));
 })();
