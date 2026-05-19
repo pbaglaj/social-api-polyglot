@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import prisma from '../config/prisma.js';
 import { validatePost, validateComment } from '../utils/validators.js';
 import { createPostWithFanout, upsertReaction, deletePostCascade } from '../services/postService.js';
+import { invalidatePrefix } from '../middlewares/cache.js';
 
 export async function createPost(req: Request, res: Response, next: NextFunction) {
   let validatedData;
@@ -136,6 +137,7 @@ export async function createComment(req: Request, res: Response, next: NextFunct
         parentId: parentId ? Number(parentId) : null,
       },
     });
+    void invalidatePrefix('posts:comments');
     res.status(201).json(comment);
   } catch (error) {
     next(error);

@@ -25,6 +25,8 @@
     "express-rate-limit": "^8.4.1",
     "knex": "^3.1.0",
     "pg": "^8.13.1",
+    "prisma": "^6.6.0",
+    "redis": "^4.7.0",
     "sequelize": "^6.37.5",
     "tsx": "^4.21.0"
   },
@@ -36,7 +38,6 @@
     "@types/supertest": "^7.2.0",
     "cross-env": "^10.1.0",
     "jest": "^30.3.0",
-    "prisma": "^6.6.0",
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.9",
     "ts-node": "^10.9.2",
