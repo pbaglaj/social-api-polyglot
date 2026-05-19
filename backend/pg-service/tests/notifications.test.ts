@@ -1,7 +1,7 @@
 import { afterEach, describe, it, expect, jest } from '@jest/globals';
 import request from 'supertest';
 import { createApp } from './appSetup.js';
-import { Notification, NotificationType } from '../src/sequelize.js';
+import { Notification, NotificationType } from '../src/models/index.js';
 
 const app = createApp();
 

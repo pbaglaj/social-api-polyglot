@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import express from 'express';
-import feedRoutes from '../feedRoutes.js';
+import feedRoutes from '../routes/feedRoutes.js';
 import { UserFeedEntry } from '../models/UserFeedEntry.js';
 
 const createApp = () => {

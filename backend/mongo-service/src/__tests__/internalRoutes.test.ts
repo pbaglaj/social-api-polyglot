@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import express from 'express';
-import internalRoutes from '../internalRoutes.js';
+import internalRoutes from '../routes/internalRoutes.js';
 import { RichPost } from '../models/RichPost.js';
 import { UserFeedEntry } from '../models/UserFeedEntry.js';
 import { ActivityDaily } from '../models/ActivityDaily.js';

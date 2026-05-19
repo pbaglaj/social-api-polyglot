@@ -9,7 +9,7 @@ export function validatePost(data: any): { authorId: number, bodyPreview: string
   if (!data.authorId || typeof data.authorId !== 'number') {
     throw new ValidationError('Id autora musi być liczbą.');
   }
-  
+
   if (!data.bodyPreview || typeof data.bodyPreview !== 'string' || data.bodyPreview.trim() === '') {
     throw new ValidationError('Treść posta nie może być pusta.');
   }

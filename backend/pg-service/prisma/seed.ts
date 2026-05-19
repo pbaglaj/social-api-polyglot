@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import prisma from '../src/db.ts'; // Importujemy klienta Prisma do bezpośredniego użycia w seedowaniu
+import prisma from '../src/config/prisma.ts'; // Importujemy klienta Prisma do bezpośredniego użycia w seedowaniu
 
 // Główna funkcja wyciągnięta na zewnątrz do łatwego testowania
 export async function seedDatabase(dbClient: any) {

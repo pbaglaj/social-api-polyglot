@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, jest } from '@jest/globals';
 import request from 'supertest';
 import { createApp } from '../appSetup.js';
-import prisma from '../../src/db.js';
+import prisma from '../../src/config/prisma.js';
 
 // Bramka: testy integracyjne odpalaja sie tylko gdy jawnie wlaczone (RUN_INTEGRATION=true).
 // Wymagaja realnego Postgresa z zaaplikowanymi migracjami. Default `npm test` (z mockami)

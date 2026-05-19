@@ -46,8 +46,6 @@ const prismaClientSingleton = () => {
 
 type PrismaClientSingleton = ReturnType<typeof prismaClientSingleton>;
 
-// Persist the Prisma client on globalThis to avoid creating
-// multiple instances during hot-reloads or repeated imports.
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClientSingleton;
 };

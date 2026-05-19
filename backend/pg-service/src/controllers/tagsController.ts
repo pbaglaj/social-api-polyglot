@@ -1,14 +1,8 @@
-import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
-import knex from './knex.js';
+import knex from '../config/knex.js';
 
-const router = Router();
-
-// T2 - endpoint z dynamicznym WHERE budowanym przez Query Builder Knexa.
-// Żadnych konkatenacji stringów - same `.where()`, `.andWhere()`, bindings.
-// Filtruje: name (ILIKE), minUsage (>=), createdBefore (<).
-// Sortowanie: usage_count|name, kierunek asc|desc.
-router.get('/', async (req: Request, res: Response, next: NextFunction) => {
+// T2: dynamiczny WHERE budowany Query Builderem (bez konkatenacji stringów).
+export async function listTags(req: Request, res: Response, next: NextFunction) {
   const name = typeof req.query.name === 'string' ? req.query.name.trim() : '';
   const minUsage = req.query.minUsage ? Number(req.query.minUsage) : null;
   const createdBefore = typeof req.query.createdBefore === 'string' ? req.query.createdBefore : '';
@@ -16,16 +10,11 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   const order = req.query.order === 'asc' ? 'asc' : 'desc';
   const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '50'), 10) || 50, 1), 100);
 
-  // Walidacja PRZED budową zapytania Knex.
   let before: Date | null = null;
   if (createdBefore) {
     const parsed = new Date(createdBefore);
     if (Number.isNaN(parsed.getTime())) {
-      return res.status(400).json({
-        error: 'Validation Error',
-        code: 'INVALID_DATE',
-        details: 'createdBefore musi być prawidłową datą ISO 8601.'
-      });
+      return res.status(400).json({ error: 'Validation Error', code: 'INVALID_DATE', details: 'createdBefore musi być prawidłową datą ISO 8601.' });
     }
     before = parsed;
   }
@@ -50,24 +39,15 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   } catch (error) {
     next(error);
   }
-});
+}
 
-// POST /api/tags - utworzenie nowego tagu (parametry powiązane przez Knex bindings).
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+export async function createTag(req: Request, res: Response, next: NextFunction) {
   const { name, description } = req.body || {};
   if (typeof name !== 'string' || !name.trim()) {
-    return res.status(400).json({
-      error: 'Validation Error',
-      code: 'INVALID_TAG_NAME',
-      details: 'name musi być niepustym stringiem.'
-    });
+    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_TAG_NAME', details: 'name musi być niepustym stringiem.' });
   }
   if (name.length > 64) {
-    return res.status(400).json({
-      error: 'Validation Error',
-      code: 'TAG_NAME_TOO_LONG',
-      details: 'name musi mieć maksymalnie 64 znaki.'
-    });
+    return res.status(400).json({ error: 'Validation Error', code: 'TAG_NAME_TOO_LONG', details: 'name musi mieć maksymalnie 64 znaki.' });
   }
 
   try {
@@ -78,26 +58,16 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   } catch (error) {
     next(error);
   }
-});
+}
 
-// POST /api/tags/attach - przypisanie tagu do posta.
-// Inkrementuje licznik tagu w transakcji Knex.
-router.post('/attach', async (req: Request, res: Response, next: NextFunction) => {
+export async function attachTag(req: Request, res: Response, next: NextFunction) {
   const { postId, tagName } = req.body || {};
   const pid = Number(postId);
   if (!Number.isInteger(pid)) {
-    return res.status(400).json({
-      error: 'Validation Error',
-      code: 'INVALID_POST_ID',
-      details: 'postId musi być liczbą całkowitą.'
-    });
+    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_POST_ID', details: 'postId musi być liczbą całkowitą.' });
   }
   if (typeof tagName !== 'string' || !tagName.trim()) {
-    return res.status(400).json({
-      error: 'Validation Error',
-      code: 'INVALID_TAG_NAME',
-      details: 'tagName musi być niepustym stringiem.'
-    });
+    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_TAG_NAME', details: 'tagName musi być niepustym stringiem.' });
   }
 
   try {
@@ -123,17 +93,12 @@ router.post('/attach', async (req: Request, res: Response, next: NextFunction) =
   } catch (error) {
     next(error);
   }
-});
+}
 
-// GET /api/tags/:name/posts - posty z danym tagiem (JOIN przez Knex).
-router.get('/:name/posts', async (req: Request, res: Response, next: NextFunction) => {
+export async function postsByTag(req: Request, res: Response, next: NextFunction) {
   const nameParam = req.params.name;
   if (typeof nameParam !== 'string' || !nameParam.trim()) {
-    return res.status(400).json({
-      error: 'Validation Error',
-      code: 'INVALID_TAG_NAME',
-      details: 'name musi być niepustym stringiem.'
-    });
+    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_TAG_NAME', details: 'name musi być niepustym stringiem.' });
   }
 
   try {
@@ -155,6 +120,4 @@ router.get('/:name/posts', async (req: Request, res: Response, next: NextFunctio
   } catch (error) {
     next(error);
   }
-});
-
-export default router;
+}

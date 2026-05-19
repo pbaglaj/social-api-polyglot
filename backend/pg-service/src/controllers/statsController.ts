@@ -1,22 +1,12 @@
-import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
-import pgPool from './pgPool.js';
-
-const router = Router();
+import pgPool from '../config/pgPool.js';
 
 // T1: endpoint na natywnym sterowniku pg.
-// Wykorzystuje pulę singleton, parametryzowane zapytania ($1, $2) oraz
-// rzuca błędy z natywnym kodem (np. 22P02 - invalid_text_representation),
-// które są mapowane na HTTP w errorHandler.ts.
-router.get('/user/:id', async (req: Request, res: Response, next: NextFunction) => {
+export async function userStats(req: Request, res: Response, next: NextFunction) {
   const idParam = req.params.id;
   const userId = parseInt(String(idParam ?? ''), 10);
   if (Number.isNaN(userId)) {
-    return res.status(400).json({
-      error: 'Validation Error',
-      code: 'INVALID_USER_ID',
-      details: 'User ID must be a valid integer.'
-    });
+    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_USER_ID', details: 'User ID must be a valid integer.' });
   }
 
   try {
@@ -26,14 +16,9 @@ router.get('/user/:id', async (req: Request, res: Response, next: NextFunction) 
     );
 
     if (userResult.rowCount === 0) {
-      return res.status(404).json({
-        error: 'Not Found',
-        code: 'USER_NOT_FOUND',
-        details: `Użytkownik o ID ${userId} nie istnieje.`
-      });
+      return res.status(404).json({ error: 'Not Found', code: 'USER_NOT_FOUND', details: `Użytkownik o ID ${userId} nie istnieje.` });
     }
 
-    // Cztery parametryzowane podzapytania w jednej transakcji read-only.
     const statsResult = await pgPool.query<{
       posts_count: string;
       followers_count: string;
@@ -63,11 +48,10 @@ router.get('/user/:id', async (req: Request, res: Response, next: NextFunction) 
   } catch (error) {
     next(error);
   }
-});
+}
 
-// T1: drugi endpoint pokazujący użycie $1 + $2 (parametryzowane zapytanie z dwoma parametrami)
-// i mapowanie kodów błędów (np. 22P02, 42703).
-router.get('/posts/top', async (req: Request, res: Response, next: NextFunction) => {
+// T1: drugi endpoint pokazujący użycie $1 + $2.
+export async function topPosts(req: Request, res: Response, next: NextFunction) {
   const limitParam = req.query.limit;
   const sinceParam = req.query.since;
   const limit = Math.min(Math.max(parseInt(String(limitParam ?? '10'), 10) || 10, 1), 100);
@@ -76,11 +60,7 @@ router.get('/posts/top', async (req: Request, res: Response, next: NextFunction)
   if (typeof sinceParam === 'string' && sinceParam.trim() !== '') {
     const parsed = new Date(sinceParam);
     if (Number.isNaN(parsed.getTime())) {
-      return res.status(400).json({
-        error: 'Validation Error',
-        code: 'INVALID_SINCE',
-        details: 'since musi być prawidłową datą ISO 8601.'
-      });
+      return res.status(400).json({ error: 'Validation Error', code: 'INVALID_SINCE', details: 'since musi być prawidłową datą ISO 8601.' });
     }
     sinceDate = parsed;
   } else {
@@ -88,7 +68,6 @@ router.get('/posts/top', async (req: Request, res: Response, next: NextFunction)
   }
 
   try {
-    // Parametryzowane zapytanie z dwoma placeholderami ($1, $2) - T1.
     const result = await pgPool.query<{
       id: number;
       body_preview: string;
@@ -124,6 +103,4 @@ router.get('/posts/top', async (req: Request, res: Response, next: NextFunction)
   } catch (error) {
     next(error);
   }
-});
-
-export default router;
+}

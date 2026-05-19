@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, describe, it, expect, jest } from '@jest/globals';
 import request from 'supertest';
 import { createApp } from './appSetup.js';
-import pgPool from '../src/pgPool.js';
+import pgPool from '../src/config/pgPool.js';
 
 const app = createApp();
 
