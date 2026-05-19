@@ -4,24 +4,23 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-# Generowanie klienta Prisma (wymagane w pg-service)
+# Generowanie klienta Prisma (wymagane do uruchomienia aplikacji)
 RUN npx prisma generate
-# Kompilacja TypeScript do JS
-RUN npm run build
 
 # Etap 2: Production
 FROM node:18-alpine AS production
 WORKDIR /app
 COPY package*.json ./
-# Instalacja tylko pakietów produkcyjnych
 RUN npm ci --omit=dev
-COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/knex ./knex
 COPY knexfile.cjs ./
 COPY tsconfig.json ./
-# Prisma wymaga klienta w środowisku produkcyjnym
 RUN npx prisma generate
+
+# Non-root user (builtin in node:alpine)
+RUN chown -R node:node /app
+USER node
 
 CMD ["npx", "tsx", "src/index.ts"]
