@@ -1,4 +1,5 @@
 import prisma from '../config/prisma.js';
+import { notifyFollowersAboutNewPost } from './notificationService.js';
 
 // Adres serwisu Mongo (wewnątrz sieci Docker)
 const MONGO_SERVICE_URL = 'http://mongo-service:3002';
@@ -46,6 +47,18 @@ export async function createPostWithFanout(input: CreatePostInput) {
     if (!mongoResponse.ok) {
       const mongoError = await mongoResponse.json();
       throw new Error(`Mongo Error: ${JSON.stringify(mongoError)}`);
+    }
+
+    // Powiadomienia "new_post" do followers - best-effort, nie zwala posta.
+    if (followerIds.length > 0) {
+      notifyFollowersAboutNewPost({
+        authorId,
+        authorUsername: createdPost.author?.username ?? null,
+        postId: createdPost.id,
+        followerIds,
+      }).catch((err) =>
+        console.error(`[notifications] Blad fan-out powiadomien dla posta ${createdPost.id}:`, err)
+      );
     }
 
     return createdPost;
