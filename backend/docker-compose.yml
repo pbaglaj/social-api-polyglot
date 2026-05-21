@@ -64,6 +64,10 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
+    # Seed feedu/rich-postow (paginacja kursorem) odpalany przed startem serwera.
+    command: >
+      sh -c "node dist/seed.js
+      && node dist/index.js"
     healthcheck:
       test: ["CMD-SHELL", "node -e \"const http=require('http'); const port=process.env.PORT||process.env.MONGO_SERVICE_PORT||3002; const req=http.get({host:'127.0.0.1', port: port, path:'/api/analytics/trending', timeout:2000}, res => { if (res.statusCode >= 200 && res.statusCode < 500) process.exit(0); else process.exit(1); }); req.on('error', () => process.exit(1)); setTimeout(() => process.exit(1), 3000);\""]
       interval: 5s
