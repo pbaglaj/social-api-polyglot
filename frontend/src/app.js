@@ -375,6 +375,196 @@ async function sendLog() {
   }
 }
 
+// ---------------- STATS (T1 - pg native) ----------------
+
+async function loadUserStats() {
+  const userId = parseInt($('statsUserId').value, 10);
+  if (!Number.isInteger(userId)) { $('statsResult').textContent = 'Podaj prawidłowe userId.'; return; }
+  try {
+    $('statsResult').textContent = 'Ładowanie statystyk użytkownika...';
+    const res = await request(`/stats/user/${userId}`);
+    $('statsResult').textContent = JSON.stringify(res, null, 2);
+  } catch (e) {
+    $('statsResult').textContent = 'Błąd: ' + e.message;
+  }
+}
+
+async function loadTopPosts() {
+  const limit = parseInt($('statsTopLimit').value, 10) || 5;
+  const since = $('statsTopSince').value.trim();
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (since) params.set('since', since);
+  try {
+    $('statsResult').textContent = 'Ładowanie top postów...';
+    const res = await request(`/stats/posts/top?${params.toString()}`);
+    $('statsResult').textContent = JSON.stringify(res, null, 2);
+  } catch (e) {
+    $('statsResult').textContent = 'Błąd: ' + e.message;
+  }
+}
+
+// ---------------- TAGS (T2 - Knex.js) ----------------
+
+async function loadTags() {
+  const params = new URLSearchParams();
+  const name = $('tagSearchName').value.trim();
+  const minUsage = $('tagMinUsage').value.trim();
+  const sortBy = $('tagSort').value;
+  const order = $('tagOrder').value;
+  if (name) params.set('name', name);
+  if (minUsage) params.set('minUsage', minUsage);
+  params.set('sortBy', sortBy);
+  params.set('order', order);
+
+  try {
+    const res = await request(`/tags?${params.toString()}`);
+    const tags = (res && res.tags) || [];
+    const ul = $('tagsList');
+    ul.innerHTML = '';
+    if (!tags.length) {
+      ul.innerHTML = '<li class="empty">Brak tagów.</li>';
+      return;
+    }
+    tags.forEach(t => {
+      const li = document.createElement('li');
+      li.className = 'tag-item';
+      li.innerHTML = `<div class="tag-header">#${escapeHtml(t.name)} <small>(usage: ${t.usageCount ?? 0})</small></div>
+        ${t.description ? `<div class="tag-desc">${escapeHtml(t.description)}</div>` : ''}
+        <button data-tag="${escapeHtml(t.name)}" class="show-tag-posts">Posty z tym tagiem</button>`;
+      ul.appendChild(li);
+    });
+    ul.querySelectorAll('.show-tag-posts').forEach(b => b.addEventListener('click', onShowTagPosts));
+  } catch (e) {
+    $('tagStatus').textContent = 'Błąd ładowania: ' + e.message;
+  }
+}
+
+async function onShowTagPosts(e) {
+  const tag = e.currentTarget.dataset.tag;
+  try {
+    const res = await request(`/tags/${encodeURIComponent(tag)}/posts`);
+    alert(`#${tag} — postów: ${res.count}\n\n` +
+      (res.posts || []).map(p => `#${p.id} (author ${p.authorId}): ${p.bodyPreview}`).join('\n'));
+  } catch (err) { alert('Błąd: ' + err.message); }
+}
+
+async function createTag() {
+  const name = $('newTagName').value.trim();
+  const description = $('newTagDescription').value.trim();
+  if (!name) { $('tagStatus').textContent = 'Podaj nazwę tagu.'; return; }
+  try {
+    $('tagStatus').textContent = 'Tworzenie...';
+    const res = await request('/tags', {
+      method: 'POST',
+      body: JSON.stringify({ name, description: description || undefined })
+    });
+    $('tagStatus').textContent = `Utworzono tag #${res.name} (id=${res.id}).`;
+    $('newTagName').value = '';
+    $('newTagDescription').value = '';
+    loadTags();
+  } catch (e) {
+    $('tagStatus').textContent = 'Błąd: ' + e.message;
+  }
+}
+
+async function attachTag() {
+  const postId = parseInt($('attachPostId').value, 10);
+  const tagName = $('attachTagName').value.trim();
+  if (!Number.isInteger(postId) || !tagName) {
+    $('tagStatus').textContent = 'Podaj postId i tag.'; return;
+  }
+  try {
+    $('tagStatus').textContent = 'Przypisywanie...';
+    const res = await request('/tags/attach', {
+      method: 'POST',
+      body: JSON.stringify({ postId, tagName })
+    });
+    $('tagStatus').textContent = `Przypisano #${res.tag.name} do postu #${res.postId}.`;
+    $('attachPostId').value = '';
+    $('attachTagName').value = '';
+    loadTags();
+  } catch (e) {
+    $('tagStatus').textContent = 'Błąd: ' + e.message;
+  }
+}
+
+// ---------------- NOTIFICATIONS (T3 - Sequelize) ----------------
+
+async function loadNotifications() {
+  const userId = parseInt($('notifUserId').value, 10);
+  if (!Number.isInteger(userId)) { $('notifStatus').textContent = 'Podaj prawidłowe userId.'; return; }
+  const params = new URLSearchParams();
+  if ($('notifUnreadOnly').checked) params.set('unread', 'true');
+
+  try {
+    const res = await request(`/notifications/${userId}?${params.toString()}`);
+    const list = (res && res.notifications) || [];
+    const ul = $('notificationsList');
+    ul.innerHTML = '';
+    if (!list.length) {
+      ul.innerHTML = '<li class="empty">Brak powiadomień.</li>';
+      return;
+    }
+    list.forEach(n => {
+      const li = document.createElement('li');
+      li.className = 'notification-item' + (n.isRead ? ' is-read' : '');
+      const typeName = (n.type && n.type.name) || '?';
+      const typeIcon = (n.type && n.type.icon) || '';
+      const date = n.createdAt ? new Date(n.createdAt).toLocaleString() : '';
+      li.innerHTML = `<div class="notif-header">${escapeHtml(typeIcon)} <b>${escapeHtml(typeName)}</b>
+        <small>• ${date} ${n.isRead ? '• przeczytane' : '• <b>NOWE</b>'}</small></div>
+        <div class="notif-body">${escapeHtml(n.message || '')}</div>
+        <button data-id="${n.id}" class="delete-notif danger">Usuń</button>`;
+      ul.appendChild(li);
+    });
+    ul.querySelectorAll('.delete-notif').forEach(b => b.addEventListener('click', onDeleteNotification));
+  } catch (e) {
+    $('notifStatus').textContent = 'Błąd: ' + e.message;
+  }
+}
+
+async function onDeleteNotification(e) {
+  const id = e.currentTarget.dataset.id;
+  try {
+    await request(`/notifications/${id}`, { method: 'DELETE' });
+    loadNotifications();
+  } catch (err) { alert('Błąd usuwania: ' + err.message); }
+}
+
+async function markAllRead() {
+  const userId = parseInt($('notifUserId').value, 10);
+  if (!Number.isInteger(userId)) { $('notifStatus').textContent = 'Podaj prawidłowe userId.'; return; }
+  try {
+    $('notifStatus').textContent = 'Oznaczanie...';
+    const res = await request(`/notifications/${userId}/read-all`, { method: 'PATCH' });
+    $('notifStatus').textContent = `Oznaczono ${res.markedAsRead} powiadomień.`;
+    loadNotifications();
+  } catch (e) {
+    $('notifStatus').textContent = 'Błąd: ' + e.message;
+  }
+}
+
+async function createNotification() {
+  const userId = parseInt($('newNotifUserId').value, 10);
+  const typeName = $('newNotifType').value;
+  const message = $('newNotifMessage').value.trim();
+  if (!Number.isInteger(userId) || !message) {
+    $('notifStatus').textContent = 'Wypełnij userId i wiadomość.'; return;
+  }
+  try {
+    $('notifStatus').textContent = 'Tworzenie...';
+    const res = await request('/notifications', {
+      method: 'POST',
+      body: JSON.stringify({ userId, typeName, message })
+    });
+    $('notifStatus').textContent = `Utworzono powiadomienie #${res.id}.`;
+    $('newNotifMessage').value = '';
+    loadNotifications();
+  } catch (e) {
+    $('notifStatus').textContent = 'Błąd: ' + e.message;
+  }
+}
+
 // ---------------- SETUP ----------------
 
 function setup() {
@@ -389,6 +579,20 @@ function setup() {
   document.querySelectorAll('.analytics-btn').forEach(btn => {
     btn.addEventListener('click', () => loadAnalytics(btn.dataset.endpoint));
   });
+
+  // T1 stats
+  $('loadStatsBtn').addEventListener('click', loadUserStats);
+  $('loadTopPostsBtn').addEventListener('click', loadTopPosts);
+
+  // T2 tags
+  $('loadTagsBtn').addEventListener('click', loadTags);
+  $('createTagBtn').addEventListener('click', createTag);
+  $('attachTagBtn').addEventListener('click', attachTag);
+
+  // T3 notifications
+  $('loadNotificationsBtn').addEventListener('click', loadNotifications);
+  $('markAllReadBtn').addEventListener('click', markAllRead);
+  $('createNotifBtn').addEventListener('click', createNotification);
 
   loadPosts();
 }

@@ -28,7 +28,11 @@ Projekt wymaga m.in. sparametryzowania portów i kluczy połączeniowych do baz.
 
 Projekt oparty jest na architekturze mikroserwisowej podzielonej odpowiedzialnościami za typ bazy danych:
 
-* **pg-service** (Baza: PostgreSQL): Serwis zarządzający wysoce relacyjnymi i kanonicznymi danymi — profilami użytkowników, obserwowaniem (follower/followee), podstawowymi rekordami postów, komentarzami. Odpowiada za integralność logiki biznesowej zachowując reguły ACID.
+* **pg-service** (Baza: PostgreSQL): Serwis zarządzający wysoce relacyjnymi i kanonicznymi danymi — profilami użytkowników, obserwowaniem (follower/followee), podstawowymi rekordami postów, komentarzami. Odpowiada za integralność logiki biznesowej zachowując reguły ACID. Wewnątrz tego serwisu wykorzystywane są **cztery niezależne narzędzia** do PostgreSQL, zgodnie z wymaganiami T1-T4:
+  * **`pg` (sterownik natywny)** — endpointy `/api/stats/*` (parametryzowane $1/$2, pula singleton, SIGINT graceful shutdown).
+  * **`Knex.js`** — endpointy `/api/tags/*` (Query Builder z dynamicznym WHERE, dwie addytywne migracje + seed w `pg-service/knex/`).
+  * **`Sequelize v6`** — endpointy `/api/notifications/*` (modele `Notification`, `NotificationType` z walidatorami niestandardowymi, hookiem `beforeCreate`, managed transaction, eager loading przez `include`). Powiadomienia typu `new_post` powstają automatycznie po publikacji posta przez obserwowanego użytkownika — fan-out przez `Notification.bulkCreate` jako best-effort po pomyślnym fan-oucie feedu do Mongo (błąd zapisu powiadomień nie cofa posta).
+  * **`Prisma`** — endpointy `/api/posts/*`, `/api/users/*` (główny ORM dla User/Post/Follow/Comment/Reaction, migracje w `prisma/migrations/`).
 * **mongo-service** (Baza: MongoDB): Odpowiada za silnie zdenormalizowany model. Przechowuje feed (strumień aktywności użytkownika w postaci logu rozdzielonego podczas fan-out), obiekty bogate/rozszerzone takie jak embedy, a także agregacje (dzienne statystyki, top trendy).
 * **api-gateway**: Reverse proxy (np. NGINX) obsługujący ruch zewnętrzny. Trasuje wywołania REST API odpowiednio do serwisu PG lub Mongo, bazując na schemacie ścieżek kontrolerów i endpointów.
 
@@ -40,6 +44,7 @@ Wysoka skalowalność odczytów (feedów) jest realizowana przez schemat "fan-ou
 3. System (poprzez wywołanie HTTP/brokera) zleca do **mongo-service** wykonanie pracy komplementującej (np. wzbogacenie danych wejściowych).
 4. Następnie następuje rozproszenie referencji tego zdarzenia (wzorzec fan-out): wpis kopiowany jest kaskadowo do kolekcji feedów wszystkich aktualnie obserwujących (`user_feed_entries`), co pozwala klientowi pobrać zoptymalizowaną z góry pre-konstruowaną oś czasu z poziomu Mongo.
 5. W systemie zaimplementowano odpowiednią strategię, reagującą na błędy: np. anulowanie zdarzenia w PG (kompensacja), jeśli aktualizacja po stronie Mongo zakończyła się krytycznym błędem przedwcześnie.
+6. Po pomyślnym fan-oucie feedu pg-service wykonuje dodatkowy, **best-effort** fan-out powiadomień typu `new_post` do tabeli `notifications` (Sequelize `bulkCreate`) dla wszystkich followers autora. Każda notyfikacja niesie `relatedPostId`, więc klient może linkować bezpośrednio do nowego posta. Listę pobiera przez `GET /api/notifications/:userId?unread=true`. Błąd na tym etapie nie cofa opublikowanego posta — patrz `notifyFollowersAboutNewPost` w `pg-service/src/services/notificationService.ts`.
 
 ### Diagram sekwencji — tworzenie posta (fan-out + kompensacja)
 
@@ -60,6 +65,7 @@ sequenceDiagram
     MS->>MS: insertMany UserFeedEntry (fan-out)
     MS->>MS: upsert ActivityDaily
     MS-->>PG: 201 OK
+    PG->>PG: bulkCreate Notification (new_post) [best-effort, fire-and-forget]
     PG-->>Client: 201 Created
 
     Note over PG,MS: Sciezka kompensacji (blad po stronie Mongo)

@@ -1,0 +1,75 @@
+name: Security
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    # Tygodniowy skan na main (poniedzialki 04:00 UTC) — wylapuje nowe CVE
+    # w juz-zmergowanych zaleznosciach.
+    - cron: "0 4 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # npm audit — blokujemy PR jesli pojawi sie podatnosc high/critical.
+  # ---------------------------------------------------------------------------
+  npm-audit:
+    name: npm audit (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [pg-service, mongo-service]
+    defaults:
+      run:
+        working-directory: backend/${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/${{ matrix.service }}/package-lock.json
+      - name: npm audit (high+)
+        run: npm audit --omit=dev --audit-level=high
+
+  # ---------------------------------------------------------------------------
+  # CodeQL — statyczna analiza JS/TS.
+  # ---------------------------------------------------------------------------
+  codeql:
+    name: CodeQL (javascript-typescript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
+
+  # ---------------------------------------------------------------------------
+  # Wykrywanie sekretow w diffie/historii.
+  # ---------------------------------------------------------------------------
+  gitleaks:
+    name: Gitleaks (sekrety)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,7 +1,7 @@
 import { beforeAll, afterAll, describe, it, expect, jest } from '@jest/globals';
 import request from 'supertest';
 import { createApp } from './appSetup.js';
-import prisma from '../src/db.js';
+import prisma from '../src/config/prisma.js';
 
 const app = createApp();
 

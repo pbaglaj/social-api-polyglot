@@ -2,7 +2,7 @@ import { beforeEach, afterEach, describe, it, expect, jest } from '@jest/globals
 import request from 'supertest';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { createApp } from './appSetup.js';
-import prisma from '../src/db.js';
+import prisma from '../src/config/prisma.js';
 
 const app = createApp();
 

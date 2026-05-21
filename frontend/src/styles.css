@@ -9,7 +9,22 @@ header h1 { margin:0; font-size:18px; }
 main { display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:16px; }
 .panel { background:var(--card); padding:12px; border-radius:8px; box-shadow:0 1px 2px rgba(16,24,40,.04); }
 .panel h2 { margin-top:0; font-size:16px; }
-#posts, #feed, #analytics { grid-column:1 / -1; }
+#posts, #feed, #analytics, #stats, #tags, #notifications { grid-column:1 / -1; }
+
+/* T2 - tags */
+.tag-item { padding:8px; border-bottom:1px solid #eee; }
+.tag-header { font-weight:600; color:#1f2937; }
+.tag-header small { color:var(--muted); font-weight:400; }
+.tag-desc { font-size:13px; color:#4b5563; margin:4px 0; }
+.show-tag-posts { margin-top:4px; }
+
+/* T3 - notifications */
+.notification-item { padding:10px; border-bottom:1px solid #eee; }
+.notification-item.is-read { opacity:0.65; }
+.notif-header { font-size:13px; color:#374151; margin-bottom:4px; }
+.notif-header small { color:var(--muted); }
+.notif-body { font-size:14px; margin-bottom:6px; }
+.delete-notif { padding:3px 8px; font-size:12px; }
 .controls { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
 .controls.wrap button { margin-bottom:4px; }
 .row { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }

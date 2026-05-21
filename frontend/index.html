@@ -84,6 +84,83 @@
       <div id="feedStatus" class="status"></div>
     </section>
 
+    <section class="panel" id="stats">
+      <h2>Statystyki użytkownika (T1 — pg native)</h2>
+      <div class="controls">
+        <label>User ID: <input id="statsUserId" type="number" value="1" /></label>
+        <button id="loadStatsBtn">Pobierz statystyki</button>
+        <span class="sep">|</span>
+        <label>Top posts limit: <input id="statsTopLimit" type="number" value="5" /></label>
+        <label>Od (ISO): <input id="statsTopSince" placeholder="2026-05-01" /></label>
+        <button id="loadTopPostsBtn">Top posty</button>
+      </div>
+      <pre id="statsResult" class="result"></pre>
+    </section>
+
+    <section class="panel" id="tags">
+      <h2>Tagi (T2 — Knex.js)</h2>
+      <div class="controls">
+        <label>Nazwa: <input id="tagSearchName" placeholder="np. tech" /></label>
+        <label>Min usage: <input id="tagMinUsage" type="number" placeholder="0" /></label>
+        <label>Sort:
+          <select id="tagSort">
+            <option value="usage_count">usage_count</option>
+            <option value="name">name</option>
+          </select>
+        </label>
+        <label>Order:
+          <select id="tagOrder">
+            <option value="desc">desc</option>
+            <option value="asc">asc</option>
+          </select>
+        </label>
+        <button id="loadTagsBtn">Filtruj</button>
+      </div>
+      <ul id="tagsList"></ul>
+      <details>
+        <summary>Utwórz / przypisz tag</summary>
+        <div class="row">
+          <label class="grow">Nowy tag: <input id="newTagName" placeholder="np. devops" /></label>
+          <label class="grow">Opis: <input id="newTagDescription" placeholder="opcjonalnie" /></label>
+          <button id="createTagBtn">Utwórz</button>
+        </div>
+        <div class="row">
+          <label>Post ID: <input id="attachPostId" type="number" /></label>
+          <label class="grow">Tag: <input id="attachTagName" placeholder="np. tech" /></label>
+          <button id="attachTagBtn">Przypisz tag do postu</button>
+        </div>
+        <div id="tagStatus" class="status"></div>
+      </details>
+    </section>
+
+    <section class="panel" id="notifications">
+      <h2>Powiadomienia (T3 — Sequelize v6)</h2>
+      <div class="controls">
+        <label>User ID: <input id="notifUserId" type="number" value="1" /></label>
+        <label><input id="notifUnreadOnly" type="checkbox" /> tylko nieprzeczytane</label>
+        <button id="loadNotificationsBtn">Pobierz</button>
+        <button id="markAllReadBtn">Oznacz wszystkie jako przeczytane</button>
+      </div>
+      <ul id="notificationsList"></ul>
+      <details>
+        <summary>Utwórz powiadomienie</summary>
+        <div class="row">
+          <label>For User ID: <input id="newNotifUserId" type="number" value="1" /></label>
+          <label>Typ:
+            <select id="newNotifType">
+              <option value="follow">follow</option>
+              <option value="reaction">reaction</option>
+              <option value="comment">comment</option>
+              <option value="mention">mention</option>
+            </select>
+          </label>
+          <label class="grow">Wiadomość: <input id="newNotifMessage" placeholder="Treść powiadomienia" /></label>
+          <button id="createNotifBtn">Utwórz</button>
+        </div>
+        <div id="notifStatus" class="status"></div>
+      </details>
+    </section>
+
     <section class="panel" id="analytics">
       <h2>Analityka (Mongo)</h2>
       <div class="controls wrap">

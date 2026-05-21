@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import express from 'express';
-import analyticsRoutes from '../analyticsRoutes.js';
+import analyticsRoutes from '../routes/analyticsRoutes.js';
 import { ActivityDaily } from '../models/ActivityDaily.js';
 
 const createApp = () => {
