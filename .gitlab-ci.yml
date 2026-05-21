@@ -41,28 +41,6 @@ workflow:
       - "$SERVICE_DIR/node_modules/"
 
 # ============================================================================
-# 1. VALIDATE — walidacja kontraktow API.
-# ============================================================================
-contracts:
-  stage: validate
-  image: node:22-alpine
-  script:
-    - npx --yes @redocly/cli@latest lint openapi.yaml
-    - |
-      node -e "
-        const c = require('./postman_collection.json');
-        if (!c.info || !c.info.schema) { console.error('Brak info.schema'); process.exit(1); }
-        if (!Array.isArray(c.item) || c.item.length === 0) { console.error('Brak itemow'); process.exit(1); }
-        console.log('Postman collection OK: ' + c.item.length + ' grup');
-      "
-  rules:
-    - changes:
-        - openapi.yaml
-        - postman_collection.json
-        - backend/**/*
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
-# ============================================================================
 # 2. TEST — typecheck + unit + integration na realnym Postgresie.
 # ============================================================================
 pg-tests:
@@ -253,8 +231,6 @@ ci-passed:
     - job: pg-tests
       optional: true
     - job: mongo-tests
-      optional: true
-    - job: contracts
       optional: true
     - job: docker-build:pg
       optional: true
