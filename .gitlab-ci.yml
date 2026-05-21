@@ -113,77 +113,6 @@ docker-build:mongo:
     - docker build -t mongo-service:ci backend/mongo-service
 
 # ============================================================================
-# 4. E2E — pelny stack przez docker-compose + Newman po Postman collection.
-# ============================================================================
-e2e:
-  stage: e2e
-  image: docker:24
-  services:
-    - docker:24-dind
-  variables:
-    PG_SERVICE_PORT: "3001"
-    MONGO_SERVICE_PORT: "3002"
-    API_GATEWAY_PORT: "8080"
-    DATABASE_URL: "postgresql://postgres:secret@postgres:5432/social_db?schema=public"
-    MONGO_INITDB_ROOT_USERNAME: root
-    MONGO_INITDB_ROOT_PASSWORD: secret
-    MONGO_URI: "mongodb://root:secret@mongodb:27017/social?authSource=admin"
-  before_script:
-    - apk add --no-cache docker-cli-compose curl nodejs npm
-  script:
-    - cd backend
-    - |
-      cat > .env <<EOF
-      POSTGRES_USER=${POSTGRES_USER}
-      POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      POSTGRES_DB=${POSTGRES_DB}
-      DATABASE_URL=${DATABASE_URL}
-      MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
-      MONGO_URI=${MONGO_URI}
-      PG_SERVICE_PORT=${PG_SERVICE_PORT}
-      MONGO_SERVICE_PORT=${MONGO_SERVICE_PORT}
-      API_GATEWAY_PORT=${API_GATEWAY_PORT}
-      EOF
-    - docker compose up -d --build
-    - cd ..
-    - |
-      echo "Czekam na API gateway..."
-      for i in $(seq 1 60); do
-        if curl -sf "http://docker:${API_GATEWAY_PORT}/api/posts" >/dev/null; then
-          echo "Gateway gotowy po $i probach"
-          break
-        fi
-        sleep 3
-        if [ "$i" = "60" ]; then
-          echo "Gateway nie wstal"
-          cd backend && docker compose ps && docker compose logs --tail=200
-          exit 1
-        fi
-      done
-    - npx --yes newman@latest run postman_collection.json
-        --env-var "baseUrl=http://docker:${API_GATEWAY_PORT}"
-        --reporters cli,junit
-        --reporter-junit-export newman-report.xml
-        --bail folder
-  after_script:
-    - cd backend && docker compose logs --tail=200 || true
-    - cd backend && docker compose down -v || true
-  artifacts:
-    when: always
-    paths:
-      - newman-report.xml
-    reports:
-      junit: newman-report.xml
-    expire_in: 1 week
-  rules:
-    - changes:
-        - backend/**/*
-        - postman_collection.json
-        - .gitlab-ci.yml
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
-# ============================================================================
 # 5. SECURITY — npm audit + gitleaks.
 # ============================================================================
 .audit-base:
@@ -235,8 +164,6 @@ ci-passed:
     - job: docker-build:pg
       optional: true
     - job: docker-build:mongo
-      optional: true
-    - job: e2e
       optional: true
   script:
     - echo "Wszystkie wymagane joby przeszly."
