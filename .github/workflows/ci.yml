@@ -218,7 +218,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Zapisz .env dla docker-compose
+      - name: Zapisz .env i sekrety dla docker-compose
         working-directory: backend
         run: |
           cat <<EOF > .env
@@ -233,6 +233,11 @@ jobs:
           MONGO_SERVICE_PORT=${MONGO_SERVICE_PORT}
           API_GATEWAY_PORT=${API_GATEWAY_PORT}
           EOF
+          # Pliki sekretow (gitignored) — docker-compose montuje je jako secrets.
+          # Bez znaku konca linii, zgodnie z secrets/README.md.
+          mkdir -p secrets
+          printf '%s' "${POSTGRES_PASSWORD}" > secrets/postgres_password.txt
+          printf '%s' "${MONGO_INITDB_ROOT_PASSWORD}" > secrets/mongo_password.txt
 
       - name: docker compose up (build + start)
         working-directory: backend
