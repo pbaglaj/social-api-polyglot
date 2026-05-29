@@ -6,6 +6,8 @@
   "scripts": {
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "start": "tsx src/index.ts",
+    "seed": "tsx src/seed.ts",
+    "seed:prod": "node dist/seed.js",
     "build": "tsc"
   },
   "keywords": [],

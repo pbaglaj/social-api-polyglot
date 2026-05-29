@@ -10,7 +10,12 @@ paths:
   /posts:
     post:
       summary: Utworzenie postu i rozgłoszenie do obserwujących
-      description: Tworzy rekord zapisu postu w PostgreSQL oraz zdenormalizowane entry w systemie MongoDB dla całego feedu obserwatorów.
+      description: |
+        Tworzy rekord postu w PostgreSQL, zdenormalizowane entries w MongoDB
+        dla feedu obserwatorów (fan-out), a następnie best-effort rozsyła
+        powiadomienia typu `new_post` do wszystkich followers autora
+        (tabela `notifications` w PG, `relatedPostId` ustawione na nowy post).
+        Błąd zapisu powiadomień nie powoduje rollbacku posta.
       requestBody:
         required: true
         content:
@@ -396,6 +401,10 @@ paths:
   /notifications/{userId}:
     get:
       summary: T3 - Lista powiadomień użytkownika (Sequelize eager loading)
+      description: |
+        Zwraca powiadomienia wraz z typem (eager loading `include`).
+        Powiadomienia typu `new_post` są generowane automatycznie przy
+        publikacji posta przez obserwowanego użytkownika - patrz POST /posts.
       parameters:
         - in: path
           name: userId
@@ -416,8 +425,19 @@ paths:
           content:
             application/json:
               example:
-                count: 1
+                count: 2
                 notifications:
+                  - id: 6
+                    userId: 1
+                    typeId: 5
+                    message: "alice dodal(a) nowy post."
+                    isRead: false
+                    relatedPostId: 42
+                    type:
+                      id: 5
+                      name: "new_post"
+                      icon: "📝"
+                      priority: 5
                   - id: 5
                     userId: 1
                     typeId: 2
@@ -444,7 +464,7 @@ paths:
                   example: 1
                 typeName:
                   type: string
-                  enum: [follow, reaction, comment, mention]
+                  enum: [follow, reaction, comment, mention, new_post]
                   example: "follow"
                 message:
                   type: string
@@ -489,6 +509,20 @@ paths:
           description: Usunięto
         '404':
           description: Nie znaleziono
+  /analytics/trending:
+    get:
+      summary: T7 - Trending posty (Aggregation Pipeline z $lookup)
+      description: Top posty z ostatnich 7 dni wg liczby fan-out wpisów w UserFeedEntry.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              example:
+                trending:
+                  - postId: 42
+                    reach: 35
+                    averageScore: 1.2
   /analytics/top-authors-weekly:
     get:
       summary: Analiza MongoDB pobierająca najlepszych autorów z tego tygodnia (Aggregation Pipeline)

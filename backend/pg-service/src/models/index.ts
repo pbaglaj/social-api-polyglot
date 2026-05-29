@@ -20,6 +20,7 @@ export async function initSequelize(): Promise<void> {
     { name: 'reaction', icon: '❤️', priority: 4 },
     { name: 'comment',  icon: '💬', priority: 6 },
     { name: 'mention',  icon: '@',  priority: 7 },
+    { name: 'new_post', icon: '📝', priority: 5 },
   ];
   for (const s of seeds) {
     await NotificationType.findOrCreate({ where: { name: s.name }, defaults: s });

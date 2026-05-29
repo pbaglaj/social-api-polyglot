@@ -1,0 +1,308 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Wykrywanie zmian — kazdy serwis testujemy tylko jesli sie zmienil.
+  # ---------------------------------------------------------------------------
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      pg: ${{ steps.filter.outputs.pg }}
+      mongo: ${{ steps.filter.outputs.mongo }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      infra: ${{ steps.filter.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            pg:
+              - 'backend/pg-service/**'
+              - '.github/workflows/ci.yml'
+            mongo:
+              - 'backend/mongo-service/**'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'frontend/**'
+            infra:
+              - 'backend/docker-compose.yml'
+              - 'backend/api-gateway/**'
+              - 'backend/*/Dockerfile'
+
+  # ---------------------------------------------------------------------------
+  # 2. pg-service — typecheck + unit + integration na realnym Postgresie.
+  # ---------------------------------------------------------------------------
+  pg-service:
+    name: pg-service (typecheck + tests)
+    needs: changes
+    if: needs.changes.outputs.pg == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: social_db
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d social_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:secret@localhost:5433/social_db?schema=public
+      NODE_ENV: test
+
+    defaults:
+      run:
+        working-directory: backend/pg-service
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/pg-service/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: TypeScript typecheck
+        run: npm run build
+
+      - name: Wait for Postgres
+        run: |
+          for i in {1..30}; do
+            pg_isready -h localhost -p 5433 -U postgres && exit 0
+            sleep 2
+          done
+          echo "Postgres nie wstal" && exit 1
+
+      - name: Apply Prisma migrations
+        run: npx prisma migrate deploy
+
+      - name: Apply Knex migrations
+        run: npx knex migrate:latest --knexfile knexfile.cjs
+
+      - name: Unit tests (z mockami)
+        run: npm test -- --ci --reporters=default --reporters=summary
+
+      - name: Integration tests (realny Postgres)
+        run: npm run test:integration -- --ci --reporters=default
+
+  # ---------------------------------------------------------------------------
+  # 3. mongo-service — typecheck + testy node:test (z mockami mongoose).
+  # ---------------------------------------------------------------------------
+  mongo-service:
+    name: mongo-service (typecheck + tests)
+    needs: changes
+    if: needs.changes.outputs.mongo == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: backend/mongo-service
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/mongo-service/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript typecheck + build
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
+
+  # ---------------------------------------------------------------------------
+  # 4. Docker build — walidacja Dockerfile'i obu serwisow (bez pushowania).
+  # ---------------------------------------------------------------------------
+  docker-build:
+    name: Docker build (${{ matrix.service }})
+    needs: changes
+    if: |
+      needs.changes.outputs.infra == 'true' ||
+      needs.changes.outputs.pg == 'true' ||
+      needs.changes.outputs.mongo == 'true' ||
+      github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [pg-service, mongo-service]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build ${{ matrix.service }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend/${{ matrix.service }}
+          file: backend/${{ matrix.service }}/Dockerfile
+          push: false
+          load: true
+          tags: ${{ matrix.service }}:ci
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,scope=${{ matrix.service }},mode=max
+
+  # ---------------------------------------------------------------------------
+  # 5. E2E — pelny docker-compose + newman po Postman collection.
+  # ---------------------------------------------------------------------------
+  e2e:
+    name: E2E (docker-compose + Postman)
+    needs: [pg-service, mongo-service, docker-build]
+    if: |
+      always() &&
+      needs.pg-service.result != 'failure' &&
+      needs.mongo-service.result != 'failure' &&
+      needs.docker-build.result != 'failure' &&
+      (needs.pg-service.result == 'success' || needs.mongo-service.result == 'success' || needs.docker-build.result == 'success' || github.event_name == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: social_db
+      DATABASE_URL: postgresql://postgres:secret@postgres:5432/social_db?schema=public
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: secret
+      MONGO_URI: mongodb://root:secret@mongodb:27017/social?authSource=admin
+      PG_SERVICE_PORT: 3001
+      MONGO_SERVICE_PORT: 3002
+      API_GATEWAY_PORT: 8080
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Zapisz .env dla docker-compose
+        working-directory: backend
+        run: |
+          cat <<EOF > .env
+          POSTGRES_USER=${POSTGRES_USER}
+          POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+          POSTGRES_DB=${POSTGRES_DB}
+          DATABASE_URL=${DATABASE_URL}
+          MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+          MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+          MONGO_URI=${MONGO_URI}
+          PG_SERVICE_PORT=${PG_SERVICE_PORT}
+          MONGO_SERVICE_PORT=${MONGO_SERVICE_PORT}
+          API_GATEWAY_PORT=${API_GATEWAY_PORT}
+          EOF
+
+      - name: docker compose up (build + start)
+        working-directory: backend
+        run: docker compose up -d --build
+
+      - name: Wait for API gateway
+        run: |
+          for i in {1..60}; do
+            if curl -sf http://localhost:${API_GATEWAY_PORT}/api/posts >/dev/null; then
+              echo "Gateway gotowy po ${i} probach"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Gateway nie wstal w 180s"
+          docker compose -f backend/docker-compose.yml ps
+          exit 1
+
+      - name: Newman — Postman collection
+        run: |
+          npx --yes newman@latest run postman_collection.json \
+            --env-var "baseUrl=http://localhost:${API_GATEWAY_PORT}" \
+            --reporters cli,junit \
+            --reporter-junit-export newman-report.xml \
+            --bail folder
+
+      - name: Upload newman report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: newman-report
+          path: newman-report.xml
+          if-no-files-found: ignore
+
+      - name: Dump logow przy bledzie
+        if: failure()
+        working-directory: backend
+        run: |
+          docker compose ps
+          docker compose logs --no-color --tail=200
+
+      - name: docker compose down
+        if: always()
+        working-directory: backend
+        run: docker compose down -v
+
+  # ---------------------------------------------------------------------------
+  # 6. Bramka koncowa — wszystko musi przejsc, zeby PR mozna bylo zmergowac.
+  #    Ustaw w Branch protection: required check = "CI passed".
+  # ---------------------------------------------------------------------------
+  ci-passed:
+    name: CI passed
+    if: always()
+    needs: [pg-service, mongo-service, docker-build, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sprawdz wyniki wszystkich jobow
+        run: |
+          echo "pg-service     = ${{ needs.pg-service.result }}"
+          echo "mongo-service  = ${{ needs.mongo-service.result }}"
+          echo "docker-build   = ${{ needs.docker-build.result }}"
+          echo "e2e            = ${{ needs.e2e.result }}"
+          for r in \
+            "${{ needs.pg-service.result }}" \
+            "${{ needs.mongo-service.result }}" \
+            "${{ needs.docker-build.result }}" \
+            "${{ needs.e2e.result }}"; do
+            if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
+              echo "Pipeline FAILED (job result=$r)"
+              exit 1
+            fi
+          done
+          echo "Wszystkie wymagane joby OK."
