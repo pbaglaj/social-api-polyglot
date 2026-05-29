@@ -1,10 +1,18 @@
 import { Router, type Request, type Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import prisma from '../config/prisma.js';
 import { getRedis } from '../config/redis.js';
 
 const router = Router();
 
-router.get('/', async (_req: Request, res: Response) => {
+const healthRateLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30, // limit each IP to 30 health checks per minute
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+router.get('/', healthRateLimiter, async (_req: Request, res: Response) => {
   const checks: Record<string, { ok: boolean; error?: string }> = {};
 
   try {
