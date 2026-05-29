@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-# Generowanie klienta Prisma (wymagane w pg-service)
+# Generowanie klienta Prisma (wymagane do uruchomienia aplikacji)
 RUN npx prisma generate
 # Typecheck (tsconfig ma noEmit:true — nic nie emituje, ale waliduje typy)
 RUN npm run build
@@ -23,5 +23,9 @@ COPY knexfile.cjs ./
 COPY tsconfig.json ./
 # Prisma wymaga klienta w srodowisku produkcyjnym
 RUN npx prisma generate
+
+# Non-root user (builtin in node:alpine)
+RUN chown -R node:node /app
+USER node
 
 CMD ["npx", "tsx", "src/index.ts"]

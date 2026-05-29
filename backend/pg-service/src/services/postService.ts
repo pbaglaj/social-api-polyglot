@@ -1,5 +1,6 @@
 import prisma from '../config/prisma.js';
 import { notifyFollowersAboutNewPost } from './notificationService.js';
+import { invalidatePrefix } from '../middlewares/cache.js';
 
 // Adres serwisu Mongo (wewnątrz sieci Docker)
 const MONGO_SERVICE_URL = 'http://mongo-service:3002';
@@ -61,6 +62,7 @@ export async function createPostWithFanout(input: CreatePostInput) {
       );
     }
 
+    void invalidatePrefix('posts:list');
     return createdPost;
   } catch (error) {
     // KOMPENSACJA (T10) - rollback w architekturze rozproszonej
@@ -96,6 +98,7 @@ export async function upsertReaction(postId: number, userId: number, type: strin
     }).catch((err) => console.error(`Blad notyfikacji reaction analytics (post ${postId}):`, err));
   }
 
+  void invalidatePrefix('posts:list');
   return reaction;
 }
 
@@ -119,5 +122,7 @@ export async function deletePostCascade(postId: number, requesterId: number) {
   fetch(`${MONGO_SERVICE_URL}/api/internal/rich-posts/${postId}`, { method: 'DELETE' })
     .catch((err) => console.error(`Błąd usuwania wpisów feedu dla posta ${postId}:`, err));
 
+  void invalidatePrefix('posts:list');
+  void invalidatePrefix('posts:comments');
   return { status: 'deleted' as const };
 }

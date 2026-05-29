@@ -3,64 +3,120 @@ services:
     image: postgres:15-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
       POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "5433:5432"
+    secrets:
+      - postgres_password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
+    cpus: 1.0
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   mongodb:
     image: mongo:6
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
-    ports:
-      - "27017:27017"
+      MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/mongo_password
+    secrets:
+      - mongo_password
+    volumes:
+      - mongodata:/data/db
+    networks:
+      - internal
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
       interval: 5s
       timeout: 5s
       retries: 5
+    cpus: 1.0
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    cpus: 0.5
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   pg-service:
+    image: project-p-baglaj/pg-service:${APP_VERSION:-dev}
     build:
       context: ./pg-service
       dockerfile: Dockerfile
     environment:
       DATABASE_URL: ${DATABASE_URL}
       PORT: ${PG_SERVICE_PORT}
-    ports:
-      - "${PG_SERVICE_PORT}:${PG_SERVICE_PORT}"
+      REDIS_URL: ${REDIS_URL}
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS}
+    networks:
+      - internal
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"const http=require('http'); const port=process.env.PORT||process.env.PG_SERVICE_PORT||3001; const req=http.get({host:'127.0.0.1', port: port, path:'/api/posts', timeout:2000}, res => { if (res.statusCode >= 200 && res.statusCode < 500) process.exit(0); else process.exit(1); }); req.on('error', () => process.exit(1)); setTimeout(() => process.exit(1), 3000);\""]
+      test: ["CMD-SHELL", "node -e \"const http=require('http'); const port=process.env.PORT||process.env.PG_SERVICE_PORT||3001; const req=http.get({host:'127.0.0.1', port: port, path:'/health', timeout:2000}, res => { if (res.statusCode >= 200 && res.statusCode < 500) process.exit(0); else process.exit(1); }); req.on('error', () => process.exit(1)); setTimeout(() => process.exit(1), 3000);\""]
       interval: 5s
       timeout: 5s
       retries: 5
     # T9: Migracje (Prisma + Knex) i seedy z compose, odpalane przed startem aplikacji.
-    # Kolejność: 1) Prisma migrate deploy (tworzy User/Post/...), 2) Knex migrate latest (dodaje tags/post_tags),
-    #            3) Prisma seed, 4) Knex seed, 5) Start serwera (Sequelize sync robi się w runtime).
+    # Kolejność: 1) Prisma migrate deploy, 2) Knex migrate latest, 3) Prisma seed, 4) Knex seed, 5) Start serwera.
     command: >
       sh -c "npx prisma migrate deploy
       && npx knex migrate:latest --knexfile knexfile.cjs
       && npx prisma db seed
       && npx knex seed:run --knexfile knexfile.cjs
       && npx tsx src/index.ts"
+    cpus: 1.0
+    mem_limit: 768m
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   mongo-service:
+    image: project-p-baglaj/mongo-service:${APP_VERSION:-dev}
     build:
       context: ./mongo-service
       dockerfile: Dockerfile
     environment:
       MONGO_URI: ${MONGO_URI}
       PORT: ${MONGO_SERVICE_PORT}
-    ports:
-      - "${MONGO_SERVICE_PORT}:${MONGO_SERVICE_PORT}"
+    networks:
+      - internal
     depends_on:
       mongodb:
         condition: service_healthy
@@ -69,10 +125,18 @@ services:
       sh -c "node dist/seed.js
       && node dist/index.js"
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"const http=require('http'); const port=process.env.PORT||process.env.MONGO_SERVICE_PORT||3002; const req=http.get({host:'127.0.0.1', port: port, path:'/api/analytics/trending', timeout:2000}, res => { if (res.statusCode >= 200 && res.statusCode < 500) process.exit(0); else process.exit(1); }); req.on('error', () => process.exit(1)); setTimeout(() => process.exit(1), 3000);\""]
+      test: ["CMD-SHELL", "node -e \"const http=require('http'); const port=process.env.PORT||process.env.MONGO_SERVICE_PORT||3002; const req=http.get({host:'127.0.0.1', port: port, path:'/health', timeout:2000}, res => { if (res.statusCode >= 200 && res.statusCode < 500) process.exit(0); else process.exit(1); }); req.on('error', () => process.exit(1)); setTimeout(() => process.exit(1), 3000);\""]
       interval: 5s
       timeout: 5s
       retries: 5
+    cpus: 1.0
+    mem_limit: 512m
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   api-gateway:
     image: nginx:alpine
@@ -80,8 +144,67 @@ services:
       - ./api-gateway/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
       - "${API_GATEWAY_PORT}:80"
+    networks:
+      - edge
+      - internal
     depends_on:
       pg-service:
         condition: service_healthy
       mongo-service:
         condition: service_healthy
+    cpus: 0.5
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  adminer:
+    image: adminer:4
+    profiles: ["tools"]
+    ports:
+      - "8081:8080"
+    networks:
+      - edge
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  mongo-express:
+    image: mongo-express:1
+    profiles: ["tools"]
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      ME_CONFIG_MONGODB_ADMINPASSWORD_FILE: /run/secrets/mongo_password
+      ME_CONFIG_BASICAUTH: "false"
+    secrets:
+      - mongo_password
+    ports:
+      - "8082:8081"
+    networks:
+      - edge
+      - internal
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+networks:
+  edge:
+    driver: bridge
+  internal:
+    driver: bridge
+    internal: true
+
+volumes:
+  pgdata:
+  mongodata:
+  redisdata:
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  mongo_password:
+    file: ./secrets/mongo_password.txt

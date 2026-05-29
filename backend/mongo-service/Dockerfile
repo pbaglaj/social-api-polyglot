@@ -13,4 +13,8 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
 
+# Non-root user (builtin in node:alpine)
+RUN chown -R node:node /app
+USER node
+
 CMD ["node", "dist/index.js"]
