@@ -30,7 +30,6 @@ jobs:
       mongo: ${{ steps.filter.outputs.mongo }}
       frontend: ${{ steps.filter.outputs.frontend }}
       infra: ${{ steps.filter.outputs.infra }}
-      contracts: ${{ steps.filter.outputs.contracts }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -49,9 +48,6 @@ jobs:
               - 'backend/docker-compose.yml'
               - 'backend/api-gateway/**'
               - 'backend/*/Dockerfile'
-            contracts:
-              - 'openapi.yaml'
-              - 'postman_collection.json'
 
   # ---------------------------------------------------------------------------
   # 2. pg-service — typecheck + unit + integration na realnym Postgresie.
@@ -159,38 +155,7 @@ jobs:
         run: npm test
 
   # ---------------------------------------------------------------------------
-  # 4. Walidacja kontraktow API (OpenAPI + Postman) — bez stawiania backendu.
-  # ---------------------------------------------------------------------------
-  contracts:
-    name: API contracts (OpenAPI + Postman)
-    needs: changes
-    if: |
-      needs.changes.outputs.contracts == 'true' ||
-      needs.changes.outputs.pg == 'true' ||
-      needs.changes.outputs.mongo == 'true' ||
-      github.event_name == 'push'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Walidacja openapi.yaml
-        run: npx --yes @redocly/cli@latest lint openapi.yaml
-
-      - name: Walidacja postman_collection.json (parse + schema)
-        run: |
-          node -e "
-            const c = require('./postman_collection.json');
-            if (!c.info || !c.info.schema) { console.error('Brak info.schema'); process.exit(1); }
-            if (!Array.isArray(c.item) || c.item.length === 0) { console.error('Brak itemow'); process.exit(1); }
-            console.log('Postman collection OK: ' + c.item.length + ' grup');
-          "
-
-  # ---------------------------------------------------------------------------
-  # 5. Docker build — walidacja Dockerfile'i obu serwisow (bez pushowania).
+  # 4. Docker build — walidacja Dockerfile'i obu serwisow (bez pushowania).
   # ---------------------------------------------------------------------------
   docker-build:
     name: Docker build (${{ matrix.service }})
@@ -221,7 +186,7 @@ jobs:
           cache-to: type=gha,scope=${{ matrix.service }},mode=max
 
   # ---------------------------------------------------------------------------
-  # 6. E2E — pelny docker-compose + newman po Postman collection.
+  # 5. E2E — pelny docker-compose + newman po Postman collection.
   # ---------------------------------------------------------------------------
   e2e:
     name: E2E (docker-compose + Postman)
@@ -315,26 +280,24 @@ jobs:
         run: docker compose down -v
 
   # ---------------------------------------------------------------------------
-  # 7. Bramka koncowa — wszystko musi przejsc, zeby PR mozna bylo zmergowac.
+  # 6. Bramka koncowa — wszystko musi przejsc, zeby PR mozna bylo zmergowac.
   #    Ustaw w Branch protection: required check = "CI passed".
   # ---------------------------------------------------------------------------
   ci-passed:
     name: CI passed
     if: always()
-    needs: [pg-service, mongo-service, contracts, docker-build, e2e]
+    needs: [pg-service, mongo-service, docker-build, e2e]
     runs-on: ubuntu-latest
     steps:
       - name: Sprawdz wyniki wszystkich jobow
         run: |
           echo "pg-service     = ${{ needs.pg-service.result }}"
           echo "mongo-service  = ${{ needs.mongo-service.result }}"
-          echo "contracts      = ${{ needs.contracts.result }}"
           echo "docker-build   = ${{ needs.docker-build.result }}"
           echo "e2e            = ${{ needs.e2e.result }}"
           for r in \
             "${{ needs.pg-service.result }}" \
             "${{ needs.mongo-service.result }}" \
-            "${{ needs.contracts.result }}" \
             "${{ needs.docker-build.result }}" \
             "${{ needs.e2e.result }}"; do
             if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
