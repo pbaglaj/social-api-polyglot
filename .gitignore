@@ -4,6 +4,7 @@ node_modules
 dist
 .vscode
 TODO.md
+temp
 
 # Docker Compose secrets
-backend/secrets/*.txt
+apps/backend/secrets/*.txt

@@ -47,13 +47,13 @@ pg-tests:
   stage: test
   extends: .node-base
   variables:
-    SERVICE_DIR: backend/pg-service
+    SERVICE_DIR: apps/backend/pg-service
     NODE_ENV: test
   services:
     - name: postgres:15-alpine
       alias: postgres
   script:
-    - cd backend/pg-service
+    - cd apps/backend/pg-service
     - npm ci
     - npx prisma generate
     - echo "Czekam na Postgres..."
@@ -66,7 +66,7 @@ pg-tests:
     - npm run test:integration -- --ci                       # integration (realna DB)
   rules:
     - changes:
-        - backend/pg-service/**/*
+        - apps/backend/pg-service/**/*
         - .gitlab-ci.yml
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
@@ -74,15 +74,15 @@ mongo-tests:
   stage: test
   extends: .node-base
   variables:
-    SERVICE_DIR: backend/mongo-service
+    SERVICE_DIR: apps/backend/mongo-service
   script:
-    - cd backend/mongo-service
+    - cd apps/backend/mongo-service
     - npm ci
     - npm run build      # typecheck + emit
     - npm test           # node:test z mockami mongoose
   rules:
     - changes:
-        - backend/mongo-service/**/*
+        - apps/backend/mongo-service/**/*
         - .gitlab-ci.yml
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
@@ -98,19 +98,19 @@ mongo-tests:
     - docker info
   rules:
     - changes:
-        - backend/**/*
+        - apps/backend/**/*
         - .gitlab-ci.yml
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 docker-build:pg:
   extends: .docker-build-base
   script:
-    - docker build -t pg-service:ci backend/pg-service
+    - docker build -t pg-service:ci apps/backend/pg-service
 
 docker-build:mongo:
   extends: .docker-build-base
   script:
-    - docker build -t mongo-service:ci backend/mongo-service
+    - docker build -t mongo-service:ci apps/backend/mongo-service
 
 # ============================================================================
 # 5. SECURITY — npm audit + gitleaks.
@@ -125,7 +125,7 @@ docker-build:mongo:
 npm-audit:pg:
   extends: .audit-base
   script:
-    - cd backend/pg-service
+    - cd apps/backend/pg-service
     - npm ci --omit=dev
     - npm audit --omit=dev --audit-level=high
   allow_failure: true   # raportuj, ale nie blokuj MR
@@ -133,7 +133,7 @@ npm-audit:pg:
 npm-audit:mongo:
   extends: .audit-base
   script:
-    - cd backend/mongo-service
+    - cd apps/backend/mongo-service
     - npm ci --omit=dev
     - npm audit --omit=dev --audit-level=high
   allow_failure: true

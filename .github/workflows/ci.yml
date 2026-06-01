@@ -37,17 +37,17 @@ jobs:
         with:
           filters: |
             pg:
-              - 'backend/pg-service/**'
+              - 'apps/backend/pg-service/**'
               - '.github/workflows/ci.yml'
             mongo:
-              - 'backend/mongo-service/**'
+              - 'apps/backend/mongo-service/**'
               - '.github/workflows/ci.yml'
             frontend:
-              - 'frontend/**'
+              - 'apps/frontend/**'
             infra:
-              - 'backend/docker-compose.yml'
-              - 'backend/api-gateway/**'
-              - 'backend/*/Dockerfile'
+              - 'apps/backend/docker-compose.yml'
+              - 'apps/backend/api-gateway/**'
+              - 'apps/backend/*/Dockerfile'
 
   # ---------------------------------------------------------------------------
   # 2. pg-service — typecheck + unit + integration na realnym Postgresie.
@@ -80,7 +80,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: backend/pg-service
+        working-directory: apps/backend/pg-service
 
     steps:
       - uses: actions/checkout@v4
@@ -90,7 +90,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: backend/pg-service/package-lock.json
+          cache-dependency-path: apps/backend/pg-service/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -133,7 +133,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: backend/mongo-service
+        working-directory: apps/backend/mongo-service
 
     steps:
       - uses: actions/checkout@v4
@@ -143,7 +143,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: backend/mongo-service/package-lock.json
+          cache-dependency-path: apps/backend/mongo-service/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -177,8 +177,8 @@ jobs:
       - name: Build ${{ matrix.service }} image
         uses: docker/build-push-action@v6
         with:
-          context: backend/${{ matrix.service }}
-          file: backend/${{ matrix.service }}/Dockerfile
+          context: apps/backend/${{ matrix.service }}
+          file: apps/backend/${{ matrix.service }}/Dockerfile
           push: false
           load: true
           tags: ${{ matrix.service }}:ci
@@ -219,7 +219,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Zapisz .env i sekrety dla docker-compose
-        working-directory: backend
+        working-directory: apps/backend
         run: |
           cat <<EOF > .env
           POSTGRES_USER=${POSTGRES_USER}
@@ -240,7 +240,7 @@ jobs:
           printf '%s' "${MONGO_INITDB_ROOT_PASSWORD}" > secrets/mongo_password.txt
 
       - name: docker compose up (build + start)
-        working-directory: backend
+        working-directory: apps/backend
         run: docker compose up -d --build
 
       - name: Wait for API gateway
@@ -253,7 +253,7 @@ jobs:
             sleep 3
           done
           echo "Gateway nie wstal w 180s"
-          docker compose -f backend/docker-compose.yml ps
+          docker compose -f apps/backend/docker-compose.yml ps
           exit 1
 
       - name: Newman — Postman collection
@@ -274,14 +274,14 @@ jobs:
 
       - name: Dump logow przy bledzie
         if: failure()
-        working-directory: backend
+        working-directory: apps/backend
         run: |
           docker compose ps
           docker compose logs --no-color --tail=200
 
       - name: docker compose down
         if: always()
-        working-directory: backend
+        working-directory: apps/backend
         run: docker compose down -v
 
   # ---------------------------------------------------------------------------

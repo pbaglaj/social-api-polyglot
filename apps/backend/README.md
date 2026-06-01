@@ -2,10 +2,10 @@
 
 ## Uruchamianie Projektu
 
-Projekt korzysta z Docker Compose do orkiestracji usług. Aby uruchomić projekt, przejdź do katalogu `backend/` i wykonaj komendę:
+Projekt korzysta z Docker Compose do orkiestracji usług. Aby uruchomić projekt, przejdź do katalogu `apps/backend/` i wykonaj komendę:
 
 ```bash
-cd backend
+cd apps/backend
 docker-compose up -d --build
 ```
 
@@ -94,13 +94,13 @@ sequenceDiagram
 
 Projekt ma dwa zestawy testów dla `pg-service`:
 
-* **Testy jednostkowe / API z mockami** — `npm test` w `backend/pg-service/`. Nie wymagają działającej bazy, mockują Prisma Client (`jest.spyOn`).
+* **Testy jednostkowe / API z mockami** — `npm test` w `apps/backend/pg-service/`. Nie wymagają działającej bazy, mockują Prisma Client (`jest.spyOn`).
 * **Testy integracyjne z realnym PostgreSQL** — `npm run test:integration`. Wymagają działającego Postgresa pod adresem z `DATABASE_URL`, z zaaplikowanymi migracjami. Test czyści tabele przed/po, więc **należy je odpalać przeciwko testowej bazie**, nie produkcyjnej.
 
 Zalecany sposób uruchomienia testów integracyjnych:
 
 ```bash
-cd backend
+cd apps/backend
 docker-compose up -d postgres
 cd pg-service
 npx prisma migrate deploy

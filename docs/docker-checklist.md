@@ -64,7 +64,7 @@ Sekrety (Docker Compose secrets): `postgres_password`, `mongo_password` — wstr
 Wymagania: Docker Desktop / Docker Engine ≥ 20.10, Docker Compose v2.
 
 ```bash
-cd backend
+cd apps/backend
 cp .env.example .env                          # uzupełnij wartości jeśli trzeba
 docker compose up --build -d                  # podstawowy tryb
 # albo z narzędziami developerskimi:

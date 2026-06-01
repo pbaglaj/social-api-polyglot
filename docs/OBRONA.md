@@ -17,7 +17,7 @@ Pula połączeń singleton (sterownik `pg`), zapytania parametryzowane ($1, $2),
 
 **Implementacja:**
 
-Pula `pg.Pool` singleton + SIGINT — [backend/pg-service/src/pgPool.ts](backend/pg-service/src/pgPool.ts):
+Pula `pg.Pool` singleton + SIGINT — [apps/backend/pg-service/src/pgPool.ts](apps/backend/pg-service/src/pgPool.ts):
 ```typescript
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -29,7 +29,7 @@ const pool = new Pool({
 process.on('SIGINT', async () => { await pool.end(); });
 ```
 
-Endpointy oparte natywnie na `pg` — [backend/pg-service/src/statsRoutes.ts](backend/pg-service/src/statsRoutes.ts):
+Endpointy oparte natywnie na `pg` — [apps/backend/pg-service/src/statsRoutes.ts](apps/backend/pg-service/src/statsRoutes.ts):
 ```typescript
 // GET /api/stats/user/:id — pojedyncze parametryzowane zapytanie z $1.
 await pgPool.query(
@@ -49,7 +49,7 @@ await pgPool.query(
 );
 ```
 
-Mapowanie błędów PostgreSQL — [backend/pg-service/src/errorHandler.ts](backend/pg-service/src/errorHandler.ts):
+Mapowanie błędów PostgreSQL — [apps/backend/pg-service/src/errorHandler.ts](apps/backend/pg-service/src/errorHandler.ts):
 ```typescript
 const PG_ERROR_CODE_MAP = {
   '23505': { status: 409, error: 'Conflict',           message: 'Naruszenie UNIQUE' },
@@ -87,17 +87,17 @@ Schemat wyłącznie przez migracje Knex (min. 2 addytywne), seedy domenowe, min.
 
 **Implementacja:**
 
-Konfiguracja — [backend/pg-service/knexfile.ts](backend/pg-service/knexfile.ts), singleton — [backend/pg-service/src/knex.ts](backend/pg-service/src/knex.ts).
+Konfiguracja — [apps/backend/pg-service/knexfile.ts](apps/backend/pg-service/knexfile.ts), singleton — [apps/backend/pg-service/src/knex.ts](apps/backend/pg-service/src/knex.ts).
 
-Dwie addytywne migracje Knex — [backend/pg-service/knex/migrations/](backend/pg-service/knex/migrations/):
+Dwie addytywne migracje Knex — [apps/backend/pg-service/knex/migrations/](apps/backend/pg-service/knex/migrations/):
 
 1. `20260514120000_create_tags.ts` — tabela `tags` (id, name UNIQUE, description, usage_count, created_at) + indeks na `usage_count DESC`.
 2. `20260514120100_create_post_tags.ts` — tabela łącząca `post_tags` (post_id, tag_id, UNIQUE razem) z FK do `"Post"` (CASCADE) i `tags`.
 
-Seed Knex — [backend/pg-service/knex/seeds/01_tags.ts](backend/pg-service/knex/seeds/01_tags.ts):
+Seed Knex — [apps/backend/pg-service/knex/seeds/01_tags.ts](apps/backend/pg-service/knex/seeds/01_tags.ts):
 Tworzy 8 kanonicznych tagów: `tech`, `news`, `sport`, `music`, `travel`, `food`, `gaming`, `photography`.
 
-Dynamiczne WHERE bez sklejania stringów — [backend/pg-service/src/tagsRoutes.ts](backend/pg-service/src/tagsRoutes.ts):
+Dynamiczne WHERE bez sklejania stringów — [apps/backend/pg-service/src/tagsRoutes.ts](apps/backend/pg-service/src/tagsRoutes.ts):
 ```typescript
 // GET /api/tags?name=tech&minUsage=5&createdBefore=2026-05-14&sortBy=usage_count&order=desc
 const query = knex('tags').select('id', 'name', 'description',
@@ -150,7 +150,7 @@ Min. 2 modele Sequelize z walidatorami niestandardowymi, relacje użyte w endpoi
 
 **Implementacja:**
 
-Singleton + modele — [backend/pg-service/src/sequelize.ts](backend/pg-service/src/sequelize.ts):
+Singleton + modele — [apps/backend/pg-service/src/sequelize.ts](apps/backend/pg-service/src/sequelize.ts):
 
 **Model 1: `NotificationType`** — walidatory `len`, `isLowercase`, niestandardowy `isInRange` (0-10):
 ```typescript
@@ -196,7 +196,7 @@ NotificationType.hasMany(Notification, { foreignKey: 'typeId', as: 'notification
 (Notification as any).markAllAsRead = async (userId: number) => { /* ... */ };
 ```
 
-**Eager loading przez `include`** — [backend/pg-service/src/notificationsRoutes.ts](backend/pg-service/src/notificationsRoutes.ts):
+**Eager loading przez `include`** — [apps/backend/pg-service/src/notificationsRoutes.ts](apps/backend/pg-service/src/notificationsRoutes.ts):
 ```typescript
 // GET /api/notifications/:userId
 const notifications = await Notification.findAll({
@@ -246,7 +246,7 @@ Min. 2 modele z relacjami, historia migracji (migrate deploy na czystej bazie), 
 
 Modele z relacjami — `Post → User` (many-to-one), `Follow → User × 2` (many-to-many), `Comment → Comment` (self-referential, wątkowanie) — schema.prisma.
 
-Historia migracji: 3 pliki w [backend/pg-service/prisma/migrations/](backend/pg-service/prisma/migrations/), `migrate deploy` stosuje je w kolejności na czystej bazie.
+Historia migracji: 3 pliki w [apps/backend/pg-service/prisma/migrations/](apps/backend/pg-service/prisma/migrations/), `migrate deploy` stosuje je w kolejności na czystej bazie.
 
 CRUD bez `any` — pełna typizacja Prisma (typy generowane ze schema.prisma):
 ```typescript
@@ -286,7 +286,7 @@ Singleton MongoClient, zamknięcie przy SIGINT, zasób domenowy sterownikiem nat
 
 **Implementacja:**
 
-Singleton + SIGINT — [backend/mongo-service/src/db.ts](backend/mongo-service/src/db.ts):
+Singleton + SIGINT — [apps/backend/mongo-service/src/db.ts](apps/backend/mongo-service/src/db.ts):
 ```typescript
 // Singleton MongoClient (native)
 if (!globalForMongo.nativeClient) {
@@ -326,7 +326,7 @@ Min. 3 operatory w endpointach:
 - `$objectToArray`, `$unwind` — pipeline reaction-distribution
 - `$sum`, `$avg`, `$round` — aggregacje statystyczne
 
-Indeks złożony — [backend/mongo-service/src/models/UserFeedEntry.ts](backend/mongo-service/src/models/UserFeedEntry.ts):
+Indeks złożony — [apps/backend/mongo-service/src/models/UserFeedEntry.ts](apps/backend/mongo-service/src/models/UserFeedEntry.ts):
 ```typescript
 UserFeedEntrySchema.index({ userId: 1, insertedAt: -1 });
 // Obsługuje zapytania: WHERE userId=X ORDER BY insertedAt DESC (feed z paginacją)
@@ -359,7 +359,7 @@ Min. 2 schematy z walidatorami niestandardowymi, subdokument lub tablica zagnie�
 
 **Implementacja:**
 
-Dwa schematy Mongoose — [backend/mongo-service/src/models/](backend/mongo-service/src/models/):
+Dwa schematy Mongoose — [apps/backend/mongo-service/src/models/](apps/backend/mongo-service/src/models/):
 
 **RichPost** — walidator niestandardowy + subdokument:
 ```typescript
@@ -410,7 +410,7 @@ UserFeedEntrySchema.virtual('richPost', {
 });
 ```
 
-Populate w endpoincie — [backend/mongo-service/src/feedRoutes.ts](backend/mongo-service/src/feedRoutes.ts):
+Populate w endpoincie — [apps/backend/mongo-service/src/feedRoutes.ts](apps/backend/mongo-service/src/feedRoutes.ts):
 ```typescript
 // GET /api/feed/:userId — pobiera feed z danymi rich post
 const entries = await UserFeedEntry.find(query)
@@ -439,7 +439,7 @@ Pipeline z `$match`, `$group`, `$project` i min. jednym dodatkowym stage; `$look
 
 **Implementacja:**
 
-Trzy endpointy analityczne — [backend/mongo-service/src/analyticsRoutes.ts](backend/mongo-service/src/analyticsRoutes.ts):
+Trzy endpointy analityczne — [apps/backend/mongo-service/src/analyticsRoutes.ts](apps/backend/mongo-service/src/analyticsRoutes.ts):
 
 **A. GET /api/analytics/trending** — top posty tygodnia (5 stages + $lookup):
 ```typescript
@@ -501,7 +501,7 @@ const pipeline = [
 
 **Implementacja:**
 
-Docker Compose — [backend/docker-compose.yml](backend/docker-compose.yml):
+Docker Compose — [apps/backend/docker-compose.yml](apps/backend/docker-compose.yml):
 ```yaml
 postgres:
   healthcheck:
@@ -535,7 +535,7 @@ Kolejność uruchamiania: `postgres` → `pg-service` (migracje+seed) → `api-g
 
 `.env.example` — [.env.example](.env.example): wszystkie zmienne środowiskowe z opisem.
 
-**Multi-stage Dockerfile** — [backend/pg-service/Dockerfile](backend/pg-service/Dockerfile):
+**Multi-stage Dockerfile** — [apps/backend/pg-service/Dockerfile](apps/backend/pg-service/Dockerfile):
 ```dockerfile
 # Stage 1: Builder — instaluje wszystkie zależności, kompiluje TypeScript
 FROM node:20-alpine AS builder
@@ -556,7 +556,7 @@ COPY --from=builder /app/prisma ./prisma
 **Pytania potencjalne:**
 - *"Co się stanie jeśli pg-service wystartuje zanim postgres jest gotowy?"* — Bez `depends_on service_healthy` połączenie do bazy się nie powiedzie. Z `service_healthy` Docker czeka na pozytywny healthcheck.
 - *"Po co multi-stage build?"* — Zmniejsza rozmiar obrazu (devDependencies jak TypeScript nie trafiają do produkcji). Poprawia bezpieczeństwo (mniej kodu = mniejsza powierzchnia ataku).
-- *"Jak uruchomić projekt?"* — `cp .env.example .env && docker compose up --build` w katalogu `backend/`.
+- *"Jak uruchomić projekt?"* — `cp .env.example .env && docker compose up --build` w katalogu `apps/backend/`.
 
 ---
 
@@ -587,7 +587,7 @@ Klient (przeglądarka/Postman)
 pg-service ──HTTP──→ mongo-service (internal API)
 ```
 
-Nginx konfiguracja — [backend/api-gateway/nginx.conf](backend/api-gateway/nginx.conf):
+Nginx konfiguracja — [apps/backend/api-gateway/nginx.conf](apps/backend/api-gateway/nginx.conf):
 ```nginx
 location /api/users    { proxy_pass http://pg-service:3001; }
 location /api/posts    { proxy_pass http://pg-service:3001; }
@@ -595,7 +595,7 @@ location /api/feed     { proxy_pass http://mongo-service:3002; }
 location /api/analytics{ proxy_pass http://mongo-service:3002; }
 ```
 
-Komunikacja HTTP między serwisami — [backend/pg-service/src/postRoutes.ts](backend/pg-service/src/postRoutes.ts):
+Komunikacja HTTP między serwisami — [apps/backend/pg-service/src/postRoutes.ts](apps/backend/pg-service/src/postRoutes.ts):
 ```typescript
 // pg-service → mongo-service po stworzeniu posta
 const MONGO_SERVICE_URL = process.env.MONGO_SERVICE_URL || 'http://mongo-service:3002';
@@ -632,7 +632,7 @@ Min. 1 operacja zapisu do PG i Mongo z rollbackiem lub kompensacją; jednolity f
 
 **Implementacja:**
 
-Kompensacja przy tworzeniu posta — [backend/pg-service/src/postRoutes.ts](backend/pg-service/src/postRoutes.ts):
+Kompensacja przy tworzeniu posta — [apps/backend/pg-service/src/postRoutes.ts](apps/backend/pg-service/src/postRoutes.ts):
 ```typescript
 let createdPost;
 try {
@@ -667,7 +667,7 @@ Scenariusz kompensacji:
 3. 🔄 Kompensacja: `DELETE FROM Post WHERE id = 42`
 4. Klient otrzymuje HTTP 500 — post nigdy nie "zaistniał"
 
-Jednolity format błędów — [backend/pg-service/src/errorHandler.ts](backend/pg-service/src/errorHandler.ts):
+Jednolity format błędów — [apps/backend/pg-service/src/errorHandler.ts](apps/backend/pg-service/src/errorHandler.ts):
 ```typescript
 // Każda odpowiedź błędu:
 res.status(status).json({
@@ -760,7 +760,7 @@ Min. zestaw testów integracyjnych lub e2e krytycznych ścieżek API (np. supert
 
 **Implementacja:**
 
-PG Service używa **Jest + supertest** — [backend/pg-service/tests/](backend/pg-service/tests/):
+PG Service używa **Jest + supertest** — [apps/backend/pg-service/tests/](apps/backend/pg-service/tests/):
 
 Testy jednostkowe (mock Prisma):
 - `posts.test.ts` — walidacja, kompensacja, reakcje idempotentne, autoryzacja DELETE
@@ -783,7 +783,7 @@ it('kompensacja: w razie błędu mongo, usuwa post z PG', async () => {
 });
 ```
 
-Mongo Service używa **Node.js test runner + supertest** — [backend/mongo-service/src/__tests__/](backend/mongo-service/src/__tests__/):
+Mongo Service używa **Node.js test runner + supertest** — [apps/backend/mongo-service/src/__tests__/](apps/backend/mongo-service/src/__tests__/):
 - `analyticsRoutes.test.ts` — wszystkie 3 endpointy analityczne
 - `internalRoutes.test.ts` — fan-out feedu, reakcje, kaskadowe usuwanie
 - `feedRoutes.test.ts` — cursor pagination
@@ -792,11 +792,11 @@ Mongo Service używa **Node.js test runner + supertest** — [backend/mongo-serv
 Uruchomienie testów:
 ```bash
 # pg-service
-cd backend/pg-service && npm test
+cd apps/backend/pg-service && npm test
 # RUN_INTEGRATION=true npm test (testy integracyjne)
 
 # mongo-service
-cd backend/mongo-service && npm test
+cd apps/backend/mongo-service && npm test
 ```
 
 **Pytania potencjalne:**
@@ -812,7 +812,7 @@ Walidacja wejścia, brak wycieku stack trace do klienta, jawna obsługa błędó
 
 **Implementacja:**
 
-Walidacja wejścia — [backend/pg-service/src/validators.ts](backend/pg-service/src/validators.ts) + [backend/mongo-service/src/models/](backend/mongo-service/src/models/):
+Walidacja wejścia — [apps/backend/pg-service/src/validators.ts](apps/backend/pg-service/src/validators.ts) + [apps/backend/mongo-service/src/models/](apps/backend/mongo-service/src/models/):
 
 ```typescript
 // Walidacja w Express (przed dotkięciem bazy)
@@ -841,7 +841,7 @@ if (err.name === 'ValidationError') { /* Mongoose validation */ }
 if (err.name === 'MongoServerError') { /* MongoDB native errors */ }
 ```
 
-Rate limiting — [backend/pg-service/src/index.ts](backend/pg-service/src/index.ts):
+Rate limiting — [apps/backend/pg-service/src/index.ts](apps/backend/pg-service/src/index.ts):
 ```typescript
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,  // 15 minut
@@ -873,7 +873,7 @@ PostgreSQL: `users`; `follows` (follower, followee, unique); `posts` (author, bo
 
 **Implementacja:**
 
-Schemat — [backend/pg-service/prisma/schema.prisma](backend/pg-service/prisma/schema.prisma):
+Schemat — [apps/backend/pg-service/prisma/schema.prisma](apps/backend/pg-service/prisma/schema.prisma):
 
 ```prisma
 model User {
@@ -936,7 +936,7 @@ MongoDB: `user_feed_entries` (userId, postId, score, insertedAt); `rich_posts` (
 
 **Implementacja:**
 
-Trzy modele Mongoose — [backend/mongo-service/src/models/](backend/mongo-service/src/models/):
+Trzy modele Mongoose — [apps/backend/mongo-service/src/models/](apps/backend/mongo-service/src/models/):
 
 **UserFeedEntry** — wpis feedu dla followera:
 ```typescript
@@ -986,7 +986,7 @@ Tworzenie postu, lista postów z filtrem (autor, hashtag). Follow/unfollow. Doda
 
 **Implementacja:**
 
-**Tworzenie posta** (POST /api/posts) — [backend/pg-service/src/postRoutes.ts](backend/pg-service/src/postRoutes.ts):
+**Tworzenie posta** (POST /api/posts) — [apps/backend/pg-service/src/postRoutes.ts](apps/backend/pg-service/src/postRoutes.ts):
 - Walidacja: `authorId` wymagany, `bodyPreview` max 255 znaków
 - INSERT do PostgreSQL
 - HTTP POST do mongo-service (fan-out feedu)
@@ -1056,7 +1056,7 @@ Blokada self-follow. Limit długości treści. Usunięcie postu usuwa wpisy feed
 
 **Implementacja:**
 
-**Blokada self-follow** — [backend/pg-service/src/userRoutes.ts](backend/pg-service/src/userRoutes.ts):
+**Blokada self-follow** — [apps/backend/pg-service/src/userRoutes.ts](apps/backend/pg-service/src/userRoutes.ts):
 ```typescript
 if (followerId === followeeId) {
   return res.status(400).json({
@@ -1090,7 +1090,7 @@ fetch(`${MONGO_SERVICE_URL}/api/internal/rich-posts/${postId}`, { method: 'DELET
 res.status(204).send();
 ```
 
-**Rate limiting** (429 + nagłówki) — [backend/pg-service/src/index.ts](backend/pg-service/src/index.ts):
+**Rate limiting** (429 + nagłówki) — [apps/backend/pg-service/src/index.ts](apps/backend/pg-service/src/index.ts):
 ```typescript
 app.use('/api/', rateLimit({
   windowMs: 15 * 60 * 1000,

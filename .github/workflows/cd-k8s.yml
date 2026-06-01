@@ -6,7 +6,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "backend/**"
+      - "apps/backend/**"
       - "k8s/**"
       - ".github/workflows/cd-k8s.yml"
   workflow_dispatch:
@@ -54,8 +54,8 @@ jobs:
       - name: Build pg-service
         uses: docker/build-push-action@v6
         with:
-          context: backend/pg-service
-          file: backend/pg-service/Dockerfile
+          context: apps/backend/pg-service
+          file: apps/backend/pg-service/Dockerfile
           load: true
           tags: |
             pg-service:dev
@@ -66,8 +66,8 @@ jobs:
       - name: Build mongo-service
         uses: docker/build-push-action@v6
         with:
-          context: backend/mongo-service
-          file: backend/mongo-service/Dockerfile
+          context: apps/backend/mongo-service
+          file: apps/backend/mongo-service/Dockerfile
           load: true
           tags: |
             mongo-service:dev

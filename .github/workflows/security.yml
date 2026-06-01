@@ -32,14 +32,14 @@ jobs:
         service: [pg-service, mongo-service]
     defaults:
       run:
-        working-directory: backend/${{ matrix.service }}
+        working-directory: apps/backend/${{ matrix.service }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: backend/${{ matrix.service }}/package-lock.json
+          cache-dependency-path: apps/backend/${{ matrix.service }}/package-lock.json
       - name: npm audit (high+)
         run: npm audit --omit=dev --audit-level=high
 

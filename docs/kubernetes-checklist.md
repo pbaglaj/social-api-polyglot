@@ -71,8 +71,8 @@ Wymagania: Docker, `kubectl`, `kind` (lub minikube/k3d).
 kind create cluster --name social
 
 # 2) Build obrazów (z korzenia repo)
-docker build -t pg-service:dev     backend/pg-service
-docker build -t mongo-service:dev  backend/mongo-service
+docker build -t pg-service:dev     apps/backend/pg-service
+docker build -t mongo-service:dev  apps/backend/mongo-service
 
 # 3) Wgranie obrazów do klastra (kind nie pobiera ich z rejestru)
 kind load docker-image pg-service:dev    --name social
