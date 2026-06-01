@@ -1,0 +1,96 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  labels:
+    app.kubernetes.io/part-of: social-api-polyglot
+# Wariant nginx.conf dla Kubernetes. W przeciwienstwie do wariantu Docker (dynamiczny
+# resolver 127.0.0.11 + zmienne, bo IP kontenerow sie zmienia), tutaj proxy_pass uzywa
+# wprost nazw Service'ow — ClusterIP Service'u jest STABILNY, wiec nginx rozwiazuje je
+# raz przy starcie przez /etc/resolv.conf (CoreDNS). Restart poda backendu nie zmienia
+# ClusterIP, wiec nie trzeba odswiezac DNS.
+data:
+  nginx.conf: |
+    # Obraz nginx-unprivileged (uid 101) nie ma praw do /run — pid do /tmp.
+    pid /tmp/nginx.pid;
+
+    events {
+        worker_connections 1024;
+    }
+
+    http {
+        upstream pg_upstream {
+            server pg-service:3001;
+        }
+        upstream mongo_upstream {
+            server mongo-service:3002;
+        }
+
+        server {
+            # Obraz nginx-unprivileged dziala jako non-root i nasluchuje na 8080.
+            listen 8080;
+
+            # Standardowe naglowki dla API Gateway
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # CORS - pozwol zapytania z przegladarki podczas developmentu
+            add_header Access-Control-Allow-Origin "*" always;
+            add_header Access-Control-Allow-Methods "GET, POST, OPTIONS, PUT, PATCH, DELETE" always;
+            add_header Access-Control-Allow-Headers "Authorization,Origin,Accept,Content-Type,X-Requested-With" always;
+
+            # Obsluga preflight (OPTIONS)
+            if ($request_method = "OPTIONS") {
+                return 204;
+            }
+            add_header Access-Control-Max-Age 1728000 always;
+
+            # Health endpoints
+            location = /health {
+                default_type application/json;
+                return 200 '{"status":"ok","gateway":"nginx","upstreams":{"pg":"/health/pg","mongo":"/health/mongo"}}';
+            }
+
+            location /health/pg {
+                rewrite ^/health/pg(.*)$ /health$1 break;
+                proxy_pass http://pg_upstream;
+            }
+
+            location /health/mongo {
+                rewrite ^/health/mongo(.*)$ /health$1 break;
+                proxy_pass http://mongo_upstream;
+            }
+
+            # Endpointy - pg-service
+            location /api/users {
+                proxy_pass http://pg_upstream;
+            }
+
+            location /api/posts {
+                proxy_pass http://pg_upstream;
+            }
+
+            location /api/stats {
+                proxy_pass http://pg_upstream;
+            }
+
+            location /api/tags {
+                proxy_pass http://pg_upstream;
+            }
+
+            location /api/notifications {
+                proxy_pass http://pg_upstream;
+            }
+
+            # Endpointy - mongo-service
+            location /api/feed {
+                proxy_pass http://mongo_upstream;
+            }
+
+            location /api/analytics {
+                proxy_pass http://mongo_upstream;
+            }
+        }
+    }

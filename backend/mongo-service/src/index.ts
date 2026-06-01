@@ -7,6 +7,7 @@ import internalRoutes from './routes/internalRoutes.js';
 import feedRoutes from './routes/feedRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import healthRoutes from './routes/healthRoutes.js';
+import { metricsMiddleware, metricsHandler } from './middlewares/metrics.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import 'dotenv/config';
 
@@ -14,6 +15,10 @@ const app = express();
 const PORT = process.env.PORT || 3002;
 
 app.use(express.json());
+
+// Obserwowalnosc: zliczanie zadan HTTP + ekspozycja /metrics dla Prometheusa.
+app.use(metricsMiddleware);
+app.get('/metrics', metricsHandler);
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

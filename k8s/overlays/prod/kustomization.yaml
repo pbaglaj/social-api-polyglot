@@ -1,0 +1,52 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Srodowisko PROD — pelne 2 repliki backendu (HA), wieksze limity zasobow.
+namespace: social
+
+resources:
+  - ../../base
+
+replicas:
+  - name: pg-service
+    count: 2
+  - name: mongo-service
+    count: 2
+  - name: api-gateway
+    count: 2
+
+# PROD pobiera obrazy z rejestru (GHCR). CI nadpisuje newTag = SHA commita.
+# Domyslnie 'stable' — podmieniany w pipeline przez `kustomize edit set image`.
+images:
+  - name: pg-service
+    newName: ghcr.io/OWNER/pg-service
+    newTag: stable
+  - name: mongo-service
+    newName: ghcr.io/OWNER/mongo-service
+    newTag: stable
+
+# Wieksze limity dla obciazenia produkcyjnego.
+patches:
+  - target:
+      kind: Deployment
+      name: pg-service
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "768Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "1"
+  - target:
+      kind: Deployment
+      name: mongo-service
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "768Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "1"
+
+commonAnnotations:
+  social.env: prod

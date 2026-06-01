@@ -1,0 +1,76 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pg-migrate
+  labels:
+    app: pg-migrate
+    app.kubernetes.io/part-of: social-api-polyglot
+  annotations:
+    # Pomaga przy ponownym `apply` — Job jest immutowalny, wiec opisujemy zalecany reset.
+    description: "Prisma migrate deploy + Knex latest + seedy. Re-run: kubectl delete job pg-migrate."
+spec:
+  backoffLimit: 5
+  # Job sam sie wyczysci po 10 min od ukonczenia (kind/CI nie zasmieca sie staruszkami).
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app: pg-migrate
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      initContainers:
+        # Czekamy az Postgres przyjmuje polaczenia TCP zanim odpalimy migracje.
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Czekam na postgres:5432..."
+              until nc -z postgres 5432; do sleep 2; done
+              echo "Postgres dostepny."
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+      containers:
+        - name: migrate
+          image: pg-service:dev
+          workingDir: /app
+          # T9 (parytet z docker-compose): 1) Prisma migrate deploy, 2) Knex migrate latest,
+          # 3) Prisma seed, 4) Knex seed. Uruchamiane raz (Job).
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              npx prisma migrate deploy
+              npx knex migrate:latest --knexfile knexfile.cjs
+              npx prisma db seed
+              npx knex seed:run --knexfile knexfile.cjs
+              echo "Migracje i seedy zakonczone."
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: DATABASE_URL
+            # Seed nie korzysta z Redis — wylaczamy, by getRedis() nie wisial.
+            - name: REDIS_DISABLED
+              value: "true"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "768Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]

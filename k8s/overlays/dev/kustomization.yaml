@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Srodowisko DEV — lzejsze, pojedyncze repliki, osobny namespace.
+namespace: social-dev
+
+resources:
+  - ../../base
+
+# Jedna replika kazdego serwisu — oszczedza zasoby na lokalnym kind/minikube.
+replicas:
+  - name: pg-service
+    count: 1
+  - name: mongo-service
+    count: 1
+  - name: api-gateway
+    count: 1
+
+# DEV uzywa obrazow lokalnych (kind load) z tagiem 'dev'.
+images:
+  - name: pg-service
+    newName: pg-service
+    newTag: dev
+  - name: mongo-service
+    newName: mongo-service
+    newTag: dev
+
+# Adnotacja srodowiska na zasobach.
+commonAnnotations:
+  social.env: dev

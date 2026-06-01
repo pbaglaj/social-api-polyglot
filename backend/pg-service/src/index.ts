@@ -6,6 +6,7 @@ import statsRoutes from './routes/statsRoutes.js';
 import tagsRoutes from './routes/tagsRoutes.js';
 import notificationsRoutes from './routes/notificationsRoutes.js';
 import healthRoutes from './routes/healthRoutes.js';
+import { metricsMiddleware, metricsHandler } from './middlewares/metrics.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { initSequelize } from './models/index.js';
 import prisma from './config/prisma.js';
@@ -19,6 +20,10 @@ const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX || (process.env.NODE_EN
 
 app.use(express.json());
 app.set('trust proxy', 1);
+
+// Obserwowalnosc: zliczanie zadan HTTP + ekspozycja /metrics dla Prometheusa.
+app.use(metricsMiddleware);
+app.get('/metrics', metricsHandler);
 
 const apiLimiter = rateLimit({
   windowMs: RATE_LIMIT_WINDOW_MS,
