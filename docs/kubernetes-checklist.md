@@ -3,8 +3,7 @@
 Instrukcja umożliwia sprawdzenie projektu w ok. 20 minut na lokalnym klastrze
 (**kind**, **minikube** lub **k3d**). Manifesty są w katalogu [k8s/](../k8s) (Kustomize: `base` + `overlays/dev|prod`).
 
-> Link do ostatniego udanego workflow GitHub Actions: **TODO — wkleić po pierwszym zielonym runie `CD (Kubernetes)`**
-> (Actions → „CD (Kubernetes)” → ostatni `success`).
+> Link do ostatniego udanego workflow GitHub Actions: https://github.com/pbaglaj/social-api-polyglot/actions/runs/26750906909
 
 ---
 
@@ -77,6 +76,12 @@ docker build -t mongo-service:dev  apps/backend/mongo-service
 # 3) Wgranie obrazów do klastra (kind nie pobiera ich z rejestru)
 kind load docker-image pg-service:dev    --name social
 kind load docker-image mongo-service:dev --name social
+
+# 3b) (zalecane) Pre-load obrazów bazowych — eliminuje losowe ImagePullBackOff,
+#     gdy Docker Hub/CloudFront przerwie pobieranie (EOF) w trakcie startu podów.
+for img in redis:7-alpine postgres:15-alpine mongo:6 busybox:1.36 nginxinc/nginx-unprivileged:alpine; do
+  docker pull "$img" && kind load docker-image "$img" --name social
+done
 
 # 4) Deploy (overlay dev → namespace social-dev)
 kubectl apply -k k8s/overlays/dev
@@ -200,7 +205,8 @@ kubectl -n social-dev get pod -l app=pg-service -o jsonpath='{.items[0].spec.con
 
 # initContainer (oczekiwanie na zaleznosci) + Job migracji
 kubectl -n social-dev get pod -l app=pg-service -o jsonpath='{.items[0].spec.initContainers[*].name}'; echo
-kubectl -n social-dev logs job/pg-migrate
+# Job czysci sie sam po 1h (ttlSecondsAfterFinished) — jesli juz znikl, sprawdz status zamiast logow:
+kubectl -n social-dev logs job/pg-migrate || kubectl -n social-dev get job pg-migrate
 ```
 
 ## 8. Rolling update (min. 2 repliki backendu — overlay prod)

@@ -9,7 +9,8 @@ metadata:
     description: "Seed feedu/rich-postow (idempotentny). Re-run: kubectl delete job mongo-seed."
 spec:
   backoffLimit: 5
-  ttlSecondsAfterFinished: 600
+  # 1h — logi seeda zostaja dostepne przez caly czas przegladu wg CHECKLIST.
+  ttlSecondsAfterFinished: 3600
   template:
     metadata:
       labels:

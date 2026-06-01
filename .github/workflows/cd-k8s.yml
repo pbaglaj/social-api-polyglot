@@ -93,6 +93,15 @@ jobs:
           kind load docker-image pg-service:dev --name "${CLUSTER_NAME}"
           kind load docker-image mongo-service:dev --name "${CLUSTER_NAME}"
 
+      # Pre-load obrazow bazowych — eliminuje losowe ImagePullBackOff, gdy Docker
+      # Hub/CloudFront przerwie pobieranie (EOF) w trakcie startu podow.
+      - name: Pre-load obrazow bazowych do kind
+        run: |
+          for img in redis:7-alpine postgres:15-alpine mongo:6 busybox:1.36 nginxinc/nginx-unprivileged:alpine; do
+            docker pull "$img"
+            kind load docker-image "$img" --name "${CLUSTER_NAME}"
+          done
+
       - name: Deploy (kustomize overlay dev)
         run: kubectl apply -k k8s/overlays/dev
 

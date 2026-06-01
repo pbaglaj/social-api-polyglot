@@ -10,8 +10,9 @@ metadata:
     description: "Prisma migrate deploy + Knex latest + seedy. Re-run: kubectl delete job pg-migrate."
 spec:
   backoffLimit: 5
-  # Job sam sie wyczysci po 10 min od ukonczenia (kind/CI nie zasmieca sie staruszkami).
-  ttlSecondsAfterFinished: 600
+  # Job sam sie wyczysci po 1h od ukonczenia (kind/CI nie zasmieca sie staruszkami,
+  # ale logi sa dostepne przez caly czas przegladu wg CHECKLIST §7).
+  ttlSecondsAfterFinished: 3600
   template:
     metadata:
       labels:
