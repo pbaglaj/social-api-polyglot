@@ -2,7 +2,8 @@
 # a nastepnie otwieramy tylko konkretne sciezki:
 #   ingress-controller -> api-gateway
 #   api-gateway        -> pg-service, mongo-service
-#   pg-service         -> postgres, redis
+#   pg-service         -> postgres, redis, mongo-service (fan-out T8c)
+#                         (mongo-service ingress must allow pg-service, not only api-gateway)
 #   mongo-service      -> mongodb
 # Bazy/cache nie przyjmuja ruchu znikad poza swoimi konsumentami.
 ---
@@ -57,7 +58,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-mongo-service-from-gateway
+  name: allow-mongo-service-from-gateway-and-pg
 spec:
   podSelector:
     matchLabels:
@@ -65,10 +66,15 @@ spec:
   policyTypes:
     - Ingress
   ingress:
+    # api-gateway (public traffic) and pg-service (synchronous fan-out T8c:
+    # POST /api/internal/rich-posts, /reactions, DELETE /rich-posts/:id).
     - from:
         - podSelector:
             matchLabels:
               app: api-gateway
+        - podSelector:
+            matchLabels:
+              app: pg-service
       ports:
         - protocol: TCP
           port: 3002
