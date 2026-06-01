@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  labels:
+    app.kubernetes.io/part-of: social-api-polyglot
+# Konfiguracja NIEpoufna. Dane poufne (hasla, pelne URL z haslem) -> Secret db-credentials.
+data:
+  NODE_ENV: "production"
+  # --- PostgreSQL (czesc niepoufna) ---
+  POSTGRES_USER: "postgres"
+  POSTGRES_DB: "social_db"
+  PGDATA: "/var/lib/postgresql/data/pgdata"
+  # --- Serwisy ---
+  PG_SERVICE_PORT: "3001"
+  MONGO_SERVICE_PORT: "3002"
+  # --- Redis (cache) ---
+  REDIS_URL: "redis://redis:6379"
+  CACHE_TTL_SECONDS: "30"
