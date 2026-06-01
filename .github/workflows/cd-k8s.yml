@@ -1,0 +1,151 @@
+name: CD (Kubernetes)
+
+# Buduje obrazy, publikuje je do GHCR, a nastepnie wdraza caly stack na efemeryczny
+# klaster kind i weryfikuje rollout + dziala endpointy (add/read/health).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "k8s/**"
+      - ".github/workflows/cd-k8s.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: cd-k8s-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write # push obrazow do GHCR
+
+env:
+  REGISTRY: ghcr.io
+  CLUSTER_NAME: social
+  NAMESPACE: social-dev
+
+jobs:
+  deploy:
+    name: Build, push (GHCR) i deploy na kind
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      # Nazwa wlasciciela w GHCR musi byc malymi literami.
+      - name: Ustaw zmienne obrazow
+        id: vars
+        run: |
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "owner=$OWNER" >> "$GITHUB_OUTPUT"
+          echo "pg_image=${REGISTRY}/${OWNER}/pg-service:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "mongo_image=${REGISTRY}/${OWNER}/mongo-service:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Login do GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Budujemy raz z dwoma tagami: lokalnym (do kind load) i GHCR (do publikacji).
+      - name: Build pg-service
+        uses: docker/build-push-action@v6
+        with:
+          context: backend/pg-service
+          file: backend/pg-service/Dockerfile
+          load: true
+          tags: |
+            pg-service:dev
+            ${{ steps.vars.outputs.pg_image }}
+          cache-from: type=gha,scope=pg-service
+          cache-to: type=gha,scope=pg-service,mode=max
+
+      - name: Build mongo-service
+        uses: docker/build-push-action@v6
+        with:
+          context: backend/mongo-service
+          file: backend/mongo-service/Dockerfile
+          load: true
+          tags: |
+            mongo-service:dev
+            ${{ steps.vars.outputs.mongo_image }}
+          cache-from: type=gha,scope=mongo-service
+          cache-to: type=gha,scope=mongo-service,mode=max
+
+      # Publikacja obrazow do rejestru (wymaganie: "publikuje obraz do rejestru").
+      - name: Push obrazow do GHCR
+        run: |
+          docker push "${{ steps.vars.outputs.pg_image }}"
+          docker push "${{ steps.vars.outputs.mongo_image }}"
+
+      - name: Utworz klaster kind
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: ${{ env.CLUSTER_NAME }}
+
+      # Wgrywamy lokalne obrazy do kind — deploy uzywa tagu :dev (imagePullPolicy
+      # IfNotPresent), wiec klaster nie musi pobierac z GHCR.
+      - name: Zaladuj obrazy do kind
+        run: |
+          kind load docker-image pg-service:dev --name "${CLUSTER_NAME}"
+          kind load docker-image mongo-service:dev --name "${CLUSTER_NAME}"
+
+      - name: Deploy (kustomize overlay dev)
+        run: kubectl apply -k k8s/overlays/dev
+
+      - name: Czekaj na bazy danych
+        run: |
+          kubectl -n "$NAMESPACE" rollout status statefulset/postgres --timeout=180s
+          kubectl -n "$NAMESPACE" rollout status statefulset/mongodb --timeout=180s
+          kubectl -n "$NAMESPACE" rollout status deployment/redis --timeout=120s
+
+      - name: Czekaj na Joby migracji i seedu
+        run: |
+          kubectl -n "$NAMESPACE" wait --for=condition=complete job/pg-migrate --timeout=180s
+          kubectl -n "$NAMESPACE" wait --for=condition=complete job/mongo-seed --timeout=180s
+
+      # Wymaganie: "Workflow sprawdza rollout po wdrozeniu".
+      - name: Sprawdz rollout serwisow
+        run: |
+          kubectl -n "$NAMESPACE" rollout status deployment/pg-service --timeout=180s
+          kubectl -n "$NAMESPACE" rollout status deployment/mongo-service --timeout=180s
+          kubectl -n "$NAMESPACE" rollout status deployment/api-gateway --timeout=120s
+
+      - name: Smoke test (health + add + read)
+        run: |
+          # Port-forward do gatewaya (Ingress nie jest instalowany w tym CI).
+          kubectl -n "$NAMESPACE" port-forward svc/api-gateway 8080:80 &
+          PF_PID=$!
+          sleep 5
+
+          echo "== /health (gateway) =="
+          curl -sf http://localhost:8080/health
+          echo
+          echo "== /health/pg =="
+          curl -sf http://localhost:8080/health/pg
+          echo
+          echo "== POST /api/posts =="
+          curl -sf -X POST http://localhost:8080/api/posts \
+            -H "Content-Type: application/json" \
+            -d '{"authorId":1,"bodyPreview":"hello from CI/CD k8s"}'
+          echo
+          echo "== GET /api/posts (oczekiwany X-Cache) =="
+          curl -sf -i http://localhost:8080/api/posts | grep -i "x-cache" || true
+          echo "== GET /api/feed/1 (mongo-service) =="
+          curl -sf "http://localhost:8080/api/feed/1?limit=3" | head -c 300
+          echo
+
+          kill $PF_PID || true
+
+      - name: Diagnostyka przy bledzie
+        if: failure()
+        run: |
+          kubectl -n "$NAMESPACE" get pods -o wide || true
+          kubectl -n "$NAMESPACE" describe pods || true
+          kubectl -n "$NAMESPACE" logs -l app=pg-service --tail=100 || true
+          kubectl -n "$NAMESPACE" logs -l app=mongo-service --tail=100 || true
+          kubectl -n "$NAMESPACE" logs job/pg-migrate --tail=100 || true
+          kubectl -n "$NAMESPACE" logs job/mongo-seed --tail=100 || true
