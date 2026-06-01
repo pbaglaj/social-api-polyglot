@@ -1,0 +1,44 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Wszystkie zasoby wdrazane do namespace 'social' (overlay moze nadpisac).
+namespace: social
+
+# 'labels' zamiast przestarzalego 'commonLabels'. includeSelectors:false — nie wstrzykujemy
+# etykiety do (niemutowalnych) selektorow Deployment/StatefulSet.
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: social-api-polyglot
+    includeSelectors: false
+
+resources:
+  - namespace.yaml
+  - configmap-app.yaml
+  - configmap-nginx.yaml
+  - secret.yaml
+  - postgres-statefulset.yaml
+  - postgres-service.yaml
+  - mongodb-statefulset.yaml
+  - mongodb-service.yaml
+  - redis-deployment.yaml
+  - redis-service.yaml
+  - job-migrate.yaml
+  - job-mongo-seed.yaml
+  - pg-service-deployment.yaml
+  - pg-service-service.yaml
+  - mongo-service-deployment.yaml
+  - mongo-service-service.yaml
+  - gateway-deployment.yaml
+  - gateway-service.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+  - pdb.yaml
+
+# Centralny punkt podmiany obrazow. CI nadpisuje newName/newTag (np. ghcr.io/<owner>/...:<sha>).
+images:
+  - name: pg-service
+    newName: pg-service
+    newTag: dev
+  - name: mongo-service
+    newName: mongo-service
+    newTag: dev

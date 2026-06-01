@@ -1,0 +1,28 @@
+# PodDisruptionBudget — chroni minimalna dostepnosc replik backendu podczas
+# rolling-update, drainu wezla czy prac utrzymaniowych klastra.
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pg-service-pdb
+  labels:
+    app: pg-service
+    app.kubernetes.io/part-of: social-api-polyglot
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: pg-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mongo-service-pdb
+  labels:
+    app: mongo-service
+    app.kubernetes.io/part-of: social-api-polyglot
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: mongo-service

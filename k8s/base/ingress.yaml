@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: social-ingress
+  labels:
+    app.kubernetes.io/part-of: social-api-polyglot
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+spec:
+  ingressClassName: nginx
+  rules:
+    # Caly ruch zewnetrzny wchodzi przez Ingress -> api-gateway (nginx) -> serwisy.
+    - host: social.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 80
