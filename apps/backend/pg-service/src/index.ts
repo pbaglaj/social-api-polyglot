@@ -5,6 +5,7 @@ import userRoutes from './routes/userRoutes.js';
 import statsRoutes from './routes/statsRoutes.js';
 import tagsRoutes from './routes/tagsRoutes.js';
 import notificationsRoutes from './routes/notificationsRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 import healthRoutes from './routes/healthRoutes.js';
 import { metricsMiddleware, metricsHandler } from './middlewares/metrics.js';
 import { errorHandler } from './middlewares/errorHandler.js';
@@ -42,6 +43,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/tags', tagsRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/admin', adminRoutes);
 app.use(errorHandler);
 
 (async () => {
