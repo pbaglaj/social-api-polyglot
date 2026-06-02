@@ -103,14 +103,15 @@ export async function upsertReaction(postId: number, userId: number, type: strin
 }
 
 // T18: usunięcie postu + kaskada w PG (transakcja) + sygnał HTTP do Mongo.
-export async function deletePostCascade(postId: number, requesterId: number) {
+export async function deletePostCascade(postId: number, requesterId: number, privileged = false) {
   const post = await prisma.post.findUnique({
     where: { id: postId },
     select: { id: true, authorId: true },
   });
 
   if (!post) return { status: 'not_found' as const };
-  if (post.authorId !== requesterId) return { status: 'forbidden' as const };
+  // Wlasciciel posta albo Admin/Moderator (kasowanie dowolnego posta).
+  if (post.authorId !== requesterId && !privileged) return { status: 'forbidden' as const };
 
   await prisma.$transaction(async (tx) => {
     await tx.comment.deleteMany({ where: { postId } });

@@ -6,6 +6,10 @@ import { createPostWithFanout, upsertReaction, deletePostCascade } from '../serv
 import { invalidatePrefix } from '../middlewares/cache.js';
 
 export async function createPost(req: Request, res: Response, next: NextFunction) {
+  // Tozsamosc z tokenu (jezeli zalogowany) nadpisuje authorId z body -
+  // user moze tworzyc posty tylko we wlasnym imieniu.
+  if (req.appUser) req.body = { ...req.body, authorId: req.appUser.id };
+
   let validatedData;
   try {
     validatedData = validatePost(req.body);
@@ -68,7 +72,8 @@ export async function addReaction(req: Request, res: Response, next: NextFunctio
     return res.status(400).json({ error: 'Validation Error', code: 'INVALID_POST_ID', details: 'Post ID must be a valid number.' });
   }
 
-  const { userId, type } = req.body;
+  const userId = req.appUser ? req.appUser.id : req.body.userId;
+  const { type } = req.body;
 
   try {
     const reaction = await upsertReaction(postId, userId, type);
@@ -88,14 +93,16 @@ export async function deletePost(req: Request, res: Response, next: NextFunction
     return res.status(400).json({ error: 'Validation Error', code: 'INVALID_POST_ID', details: 'Post ID must be a valid number.' });
   }
 
-  const requesterIdRaw = req.body?.requesterId ?? req.body?.userId ?? req.body?.authorId ?? req.body?.followerId;
+  // Wlasciciel posta z tokenu; Admin/Moderator moze kasowac dowolny post.
+  const privileged = (req.roles ?? []).some((r) => r === 'Admin' || r === 'Moderator');
+  const requesterIdRaw = req.appUser ? req.appUser.id : (req.body?.requesterId ?? req.body?.userId ?? req.body?.authorId ?? req.body?.followerId);
   const requesterId = typeof requesterIdRaw === 'string' ? parseInt(requesterIdRaw, 10) : Number(requesterIdRaw);
   if (!Number.isInteger(requesterId)) {
     return res.status(400).json({ error: 'Validation Error', code: 'INVALID_REQUESTER_ID', details: 'Requester ID must be a valid number.' });
   }
 
   try {
-    const result = await deletePostCascade(postId, requesterId);
+    const result = await deletePostCascade(postId, requesterId, privileged);
     if (result.status === 'not_found') {
       return res.status(404).json({ error: 'Not Found', code: 'POST_NOT_FOUND', details: 'Post not found.' });
     }
@@ -126,7 +133,8 @@ export async function createComment(req: Request, res: Response, next: NextFunct
     return next(error);
   }
 
-  const { authorId, content, parentId } = validatedComment;
+  const { content, parentId } = validatedComment;
+  const authorId = req.appUser ? req.appUser.id : validatedComment.authorId;
 
   try {
     const comment = await prisma.comment.create({
