@@ -68,6 +68,67 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # --- Authorization Server (OAuth2 / OIDC) ---
+  # Dedykowana baza Postgres tylko dla Keycloaka (oddzielona od bazy aplikacji).
+  keycloak-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${KC_DB_USER}
+      POSTGRES_PASSWORD: ${KC_DB_PASSWORD}
+      POSTGRES_DB: ${KC_DB_NAME}
+    volumes:
+      - keycloakdata:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${KC_DB_USER} -d ${KC_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    cpus: 0.5
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Keycloak = Authorization Server. Realm SocialPolyglot importowany przy starcie
+  # z keycloak/realm-export.json (role Admin/User/Moderator/analytics + 3 klienci OAuth2).
+  # Wystawiony na hosta (port 8090) dla przegladarki; w sieci internal dostepny jako keycloak:8080.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.1
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/${KC_DB_NAME}
+      KC_DB_USERNAME: ${KC_DB_USER}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_PROXY_HEADERS: "xforwarded"
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    ports:
+      - "${KEYCLOAK_PORT:-8090}:8080"
+    networks:
+      - edge
+      - internal
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    cpus: 1.0
+    mem_limit: 1024m
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   pg-service:
     image: project-p-baglaj/pg-service:${APP_VERSION:-dev}
     build:
@@ -78,6 +139,15 @@ services:
       PORT: ${PG_SERVICE_PORT}
       REDIS_URL: ${REDIS_URL}
       CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS}
+      # OAuth2 / walidacja JWT (Keycloak)
+      KEYCLOAK_JWKS_URI: ${KEYCLOAK_JWKS_URI}
+      KEYCLOAK_ALLOWED_ISSUERS: ${KEYCLOAK_ALLOWED_ISSUERS}
+      KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE}
+      # Keycloak Admin REST API (zarzadzanie userami przez backend)
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KC_ADMIN_CLIENT_ID: ${KC_ADMIN_CLIENT_ID}
+      KC_ADMIN_CLIENT_SECRET: ${KC_ADMIN_CLIENT_SECRET}
     networks:
       - internal
     depends_on:
@@ -115,6 +185,10 @@ services:
     environment:
       MONGO_URI: ${MONGO_URI}
       PORT: ${MONGO_SERVICE_PORT}
+      # OAuth2 / walidacja JWT (Keycloak)
+      KEYCLOAK_JWKS_URI: ${KEYCLOAK_JWKS_URI}
+      KEYCLOAK_ALLOWED_ISSUERS: ${KEYCLOAK_ALLOWED_ISSUERS}
+      KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE}
     networks:
       - internal
     depends_on:
@@ -202,6 +276,7 @@ volumes:
   pgdata:
   mongodata:
   redisdata:
+  keycloakdata:
 
 secrets:
   postgres_password:
