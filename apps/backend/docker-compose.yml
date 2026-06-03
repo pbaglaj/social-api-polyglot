@@ -110,6 +110,10 @@ services:
       KC_HTTP_ENABLED: "true"
       KC_HOSTNAME_STRICT: "false"
       KC_PROXY_HEADERS: "xforwarded"
+      # Podstawiane w realm-export.json (IdP google) przy imporcie realmu.
+      # Bez tego placeholdery ${GOOGLE_CLIENT_ID}/${GOOGLE_CLIENT_SECRET} zostaja doslowne.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
     ports:
@@ -149,7 +153,11 @@ services:
       KC_ADMIN_CLIENT_ID: ${KC_ADMIN_CLIENT_ID}
       KC_ADMIN_CLIENT_SECRET: ${KC_ADMIN_CLIENT_SECRET}
     networks:
+      # internal: ruch serwis<->serwis (DB, keycloak). edge: wyjscie na zewnatrz (NAT) -
+      # potrzebne dla Fazy 4: pg-service wola Google Calendar API (siec 'internal' ma
+      # internal:true, czyli brak egressu do internetu).
       - internal
+      - edge
     depends_on:
       postgres:
         condition: service_healthy
@@ -228,6 +236,95 @@ services:
         condition: service_healthy
     cpus: 0.5
     mem_limit: 128m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # --- Client nr 1: SPA (React + Vite + PKCE) ---
+  # Statyczny bundle serwowany przez nginx. Przegladarka laduje go z :5173, a stamtad
+  # rozmawia z gatewayem (:8080) i Keycloakiem (:8090) po stronie hosta.
+  frontend:
+    image: project-p-baglaj/frontend:${APP_VERSION:-dev}
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8080/api}
+        VITE_KEYCLOAK_AUTHORITY: ${VITE_KEYCLOAK_AUTHORITY:-http://localhost:8090/realms/SocialPolyglot}
+        VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-spa-client}
+    ports:
+      - "5173:80"
+    networks:
+      - edge
+    depends_on:
+      - api-gateway
+    cpus: 0.5
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # --- Client nr 2: SSR (Express + EJS, Authorization Code confidential) ---
+  # Na edge (port 4000 + redirecty przegladarki) i internal (back-channel do keycloak:8080
+  # oraz wolanie API przez api-gateway). Tokeny trzymane w sesji serwerowej.
+  ssr-client:
+    image: project-p-baglaj/ssr-client:${APP_VERSION:-dev}
+    build:
+      context: ../ssr-client
+      dockerfile: Dockerfile
+    environment:
+      PORT: "4000"
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KEYCLOAK_PUBLIC_URL: "http://localhost:${KEYCLOAK_PORT:-8090}"
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL}
+      SSR_CLIENT_ID: ${SSR_CLIENT_ID}
+      SSR_CLIENT_SECRET: ${SSR_CLIENT_SECRET}
+      SSR_SESSION_SECRET: ${SSR_SESSION_SECRET}
+      SSR_API_BASE: "http://api-gateway/api"
+      SSR_REDIRECT_URI: "http://localhost:4000/callback"
+    ports:
+      - "4000:4000"
+    networks:
+      - edge
+      - internal
+    depends_on:
+      - keycloak
+      - api-gateway
+    cpus: 0.5
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # --- Client nr 3: M2M analytics-worker (Client Credentials) ---
+  # Tylko sieć internal (nie wystawiony na hosta). Cyklicznie agreguje analitykę z
+  # mongo-service tokenem b2b-client (rola 'analytics').
+  analytics-worker:
+    image: project-p-baglaj/analytics-worker:${APP_VERSION:-dev}
+    build:
+      context: ./analytics-worker
+      dockerfile: Dockerfile
+    environment:
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL}
+      B2B_CLIENT_ID: ${B2B_CLIENT_ID}
+      B2B_CLIENT_SECRET: ${B2B_CLIENT_SECRET}
+      MONGO_SERVICE_URL: "http://mongo-service:3002"
+      ANALYTICS_POLL_INTERVAL_SECONDS: ${ANALYTICS_POLL_INTERVAL_SECONDS:-60}
+    networks:
+      - internal
+    depends_on:
+      - keycloak
+      - mongo-service
+    cpus: 0.25
+    mem_limit: 128m
+    stop_grace_period: 10s
     logging:
       driver: json-file
       options:
