@@ -3,6 +3,7 @@
 node_modules
 dist
 .vscode
+CLAUDE.md
 TODO.md
 temp
 
