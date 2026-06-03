@@ -9,13 +9,26 @@
 |------|--------|--------|
 | **1** | Keycloak + import realm `SocialPolyglot` | ✅ DONE, zweryfikowane |
 | **2** | Resource Server: walidacja JWT + RBAC + zarządzanie userami (Keycloak Admin REST API) | ✅ DONE, zweryfikowane E2E |
-| **3a** | Client SPA (React + Vite, PKCE) | 🟡 W TRAKCIE — scaffolding (package.json, vite, tsconfig, index.html). Brakuje kodu React. |
-| **3b** | Client SSR (Express + EJS, Authorization Code confidential) | ⬜ TODO |
-| **3c** | Client M2M (`apps/backend/analytics-worker`, Client Credentials) | ⬜ TODO |
-| **4** | Google Identity Brokering + Google Calendar w feedzie | ⬜ TODO (wymaga Twoich Google OAuth credentials) |
-| **5** | Gateway/docs/testy E2E, ewentualnie k8s dla Keycloak | ⬜ TODO |
+| **3a** | Client SPA (React + Vite, PKCE) | ✅ DONE — pełny kod React, `npm run build` zielony, usługa `frontend` w compose (`:5173`) |
+| **3b** | Client SSR (Express + EJS, Authorization Code confidential) | ✅ DONE — `apps/ssr-client/`, usługa w compose (`:4000`) |
+| **3c** | Client M2M (`apps/backend/analytics-worker`, Client Credentials) | ✅ DONE — usługa w compose (internal) |
+| **4** | Google Identity Brokering + Google Calendar w feedzie | ✅ DONE, zweryfikowane E2E — IdP `google` skonfigurowany (creds w `.env`), endpoint `/api/google/calendar` zwraca `200` z realnymi wydarzeniami; panel „Google Calendar" w SPA. Trzy pułapki rozwiązane (read-token / issuer / egress) — patrz niżej. |
+| **5** | Docs + testy + smoke test | ✅ `docs/oauth2.md`; testy zielone (pg 80 pass, mongo 34 pass); naprawiony test script mongo (`NODE_ENV=test`). **Pełny `docker compose up --build` przeszedł** — patrz wyniki niżej. |
 
-Lista zadań żyje też w narzędziu Task (TaskList) — ID 1–7 odpowiadają fazom.
+### Wyniki smoke testu (`docker compose up -d --build`, ta sesja)
+Wszystkie 11 kontenerów healthy. Zweryfikowane:
+- **M2M (b2b-client):** `/api/analytics/trending` → **200**, `/api/feed/1` → **403**, bez tokenu → **401**.
+- **analytics-worker:** token po 1 próbie, RBAC check `feed → 403` (dowód least-privilege),
+  3× analytics → 200, graceful shutdown na SIGTERM.
+- **Google skeleton:** `/api/google/calendar` istnieje, RBAC działa (403 dla tokenu bez roli User).
+- **SPA (`:5173`)** serwuje 200; **SSR (`:4000`)** landing 200, `/login` → 302 na Keycloak.
+
+> Do dokończenia **ręcznie w przeglądarce** (wymaga interaktywnego logowania Keycloak):
+> pełny flow SPA (login → CRUD → panel Admina) i SSR (`/callback` → `/dashboard`).
+>
+> **Uwaga środowiskowa:** w tym checkoutcie brakowało `secrets/postgres_password.txt` i
+> `secrets/mongo_password.txt` (Docker utworzył w ich miejsce puste katalogi → Postgres nie
+> startował). Odtworzone z treścią `secret` (bez końcowego newline). Pliki są gitignorowane.
 
 ---
 
@@ -110,6 +123,17 @@ curl -s -o /dev/null -w "feed=%{http_code}\n"      -H "Authorization: Bearer $B2
 3. **`scopeMappings` w realm-export się nie zaimportowało** — porzucone na rzecz `fullScopeAllowed`.
 4. Na żywym realmie zostały ręczne zmiany z testów (`backend-admin.fullScopeAllowed=true` — już też w eksporcie; `spa-client` direct grants cofnięte). Czysty re-import (pkt 2) wyrówna stan z plikiem. W KC istnieje testowy user `testnowy/haslo123` — można skasować.
 5. Plik `.env` musi zawierać sekcje Keycloak/OAuth2 (są w `.env.example`). Lokalnie już skopiowane.
+6. **Google brokering — 3 warstwy, które trzeba przejść** (każda dawała mylący `503`/`500`):
+   - **Zmienne `GOOGLE_*` muszą trafić do kontenera `keycloak`** (compose je przekazuje),
+     inaczej `clientId` zostaje dosłownym `${GOOGLE_CLIENT_ID}` i Google odrzuca logowanie.
+   - **Rola `broker read-token` w tokenie usera** — wymagana, by odczytać zapisany token Google
+     z broker API. Daje ją flaga IdP `addReadTokenRoleOnCreate:true` (w `realm-export.json`);
+     konta powiązane przed dodaniem flagi trzeba doposażyć ręcznie. Bez niej broker → `400` → `503`.
+   - **Issuer host↔internal:** broker API pod `keycloak:8080` odrzuca token z issuerem
+     `localhost:8090` jako „Invalid token". `googleBroker.ts` dokleja `X-Forwarded-*` z claimu
+     `iss`, więc Keycloak (`KC_PROXY_HEADERS=xforwarded`) wylicza zgodny issuer.
+   - **Egress:** sieć `internal` ma `internal:true` (brak NAT) → `pg-service` jest też w `edge`,
+     żeby dosięgnąć `googleapis.com` (inaczej `fetch failed`/`EAI_AGAIN` → `500`).
 
 ---
 
