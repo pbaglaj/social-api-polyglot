@@ -164,13 +164,14 @@
     {
       "alias": "google",
       "providerId": "google",
-      "enabled": false,
+      "enabled": true,
       "storeToken": true,
+      "addReadTokenRoleOnCreate": true,
       "trustEmail": true,
       "firstBrokerLoginFlowAlias": "first broker login",
       "config": {
-        "clientId": "REPLACE_WITH_GOOGLE_CLIENT_ID",
-        "clientSecret": "REPLACE_WITH_GOOGLE_CLIENT_SECRET",
+        "clientId": "${GOOGLE_CLIENT_ID}",
+        "clientSecret": "${GOOGLE_CLIENT_SECRET}",
         "defaultScope": "openid email profile https://www.googleapis.com/auth/calendar.readonly",
         "useJwksUrl": "true",
         "syncMode": "IMPORT"
