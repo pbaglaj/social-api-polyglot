@@ -1,0 +1,10 @@
+{
+  "name": "analytics-worker",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Client nr 3 - M2M (backend-2-backend) z OAuth2 Client Credentials (Keycloak)",
+  "scripts": {
+    "start": "node src/worker.js"
+  }
+}
