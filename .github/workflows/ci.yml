@@ -241,6 +241,27 @@ jobs:
       PG_SERVICE_PORT: 3001
       MONGO_SERVICE_PORT: 3002
       API_GATEWAY_PORT: 8080
+      REDIS_URL: redis://redis:6379
+      CACHE_TTL_SECONDS: "30"
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_DB_USER: keycloak
+      KC_DB_PASSWORD: keycloak
+      KC_DB_NAME: keycloak
+      KEYCLOAK_REALM: SocialPolyglot
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/SocialPolyglot/protocol/openid-connect/certs
+      KEYCLOAK_ALLOWED_ISSUERS: http://localhost:8090/realms/SocialPolyglot,http://keycloak:8080/realms/SocialPolyglot
+      KEYCLOAK_AUDIENCE: ""
+      KC_ADMIN_CLIENT_ID: backend-admin
+      KC_ADMIN_CLIENT_SECRET: backend-admin-secret
+      SSR_CLIENT_ID: ssr-client
+      SSR_CLIENT_SECRET: ssr-client-secret
+      SSR_SESSION_SECRET: ssr-dev-session-secret
+      B2B_CLIENT_ID: b2b-client
+      B2B_CLIENT_SECRET: b2b-client-secret
+      GOOGLE_CLIENT_ID: your-google-client-id
+      GOOGLE_CLIENT_SECRET: your-google-client-secret
 
     steps:
       - uses: actions/checkout@v4
@@ -262,6 +283,27 @@ jobs:
           PG_SERVICE_PORT=${PG_SERVICE_PORT}
           MONGO_SERVICE_PORT=${MONGO_SERVICE_PORT}
           API_GATEWAY_PORT=${API_GATEWAY_PORT}
+          REDIS_URL=${REDIS_URL}
+          CACHE_TTL_SECONDS=${CACHE_TTL_SECONDS}
+          KC_BOOTSTRAP_ADMIN_USERNAME=${KC_BOOTSTRAP_ADMIN_USERNAME}
+          KC_BOOTSTRAP_ADMIN_PASSWORD=${KC_BOOTSTRAP_ADMIN_PASSWORD}
+          KC_DB_USER=${KC_DB_USER}
+          KC_DB_PASSWORD=${KC_DB_PASSWORD}
+          KC_DB_NAME=${KC_DB_NAME}
+          KEYCLOAK_REALM=${KEYCLOAK_REALM}
+          KEYCLOAK_INTERNAL_URL=${KEYCLOAK_INTERNAL_URL}
+          KEYCLOAK_JWKS_URI=${KEYCLOAK_JWKS_URI}
+          KEYCLOAK_ALLOWED_ISSUERS=${KEYCLOAK_ALLOWED_ISSUERS}
+          KEYCLOAK_AUDIENCE=${KEYCLOAK_AUDIENCE}
+          KC_ADMIN_CLIENT_ID=${KC_ADMIN_CLIENT_ID}
+          KC_ADMIN_CLIENT_SECRET=${KC_ADMIN_CLIENT_SECRET}
+          SSR_CLIENT_ID=${SSR_CLIENT_ID}
+          SSR_CLIENT_SECRET=${SSR_CLIENT_SECRET}
+          SSR_SESSION_SECRET=${SSR_SESSION_SECRET}
+          B2B_CLIENT_ID=${B2B_CLIENT_ID}
+          B2B_CLIENT_SECRET=${B2B_CLIENT_SECRET}
+          GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+          GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
           EOF
           # Pliki sekretow (gitignored) — docker-compose montuje je jako secrets.
           # Bez znaku konca linii, zgodnie z secrets/README.md.
