@@ -156,6 +156,9 @@ services:
       context: ./pg-service
       dockerfile: Dockerfile
     environment:
+      # Domyslnie puste (=produkcyjne wymuszanie auth). CI E2E ustawia NODE_ENV=test,
+      # by requireAuth/requireRole staly sie pass-through (kolekcja Postman bez tokenow).
+      NODE_ENV: ${NODE_ENV:-}
       DATABASE_URL: ${DATABASE_URL}
       PORT: ${PG_SERVICE_PORT}
       REDIS_URL: ${REDIS_URL}
@@ -215,6 +218,8 @@ services:
       context: ./mongo-service
       dockerfile: Dockerfile
     environment:
+      # Patrz pg-service: NODE_ENV=test w CI wylacza wymuszanie auth dla E2E.
+      NODE_ENV: ${NODE_ENV:-}
       MONGO_URI: ${MONGO_URI}
       PORT: ${MONGO_SERVICE_PORT}
       # OAuth2 / walidacja JWT (Keycloak)

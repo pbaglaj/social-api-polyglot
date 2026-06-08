@@ -243,25 +243,6 @@ jobs:
       API_GATEWAY_PORT: 8080
       REDIS_URL: redis://redis:6379
       CACHE_TTL_SECONDS: "30"
-      KC_BOOTSTRAP_ADMIN_USERNAME: admin
-      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
-      KC_DB_USER: keycloak
-      KC_DB_PASSWORD: keycloak
-      KC_DB_NAME: keycloak
-      KEYCLOAK_REALM: SocialPolyglot
-      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
-      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/SocialPolyglot/protocol/openid-connect/certs
-      KEYCLOAK_ALLOWED_ISSUERS: http://localhost:8090/realms/SocialPolyglot,http://keycloak:8080/realms/SocialPolyglot
-      KEYCLOAK_AUDIENCE: ""
-      KC_ADMIN_CLIENT_ID: backend-admin
-      KC_ADMIN_CLIENT_SECRET: backend-admin-secret
-      SSR_CLIENT_ID: ssr-client
-      SSR_CLIENT_SECRET: ssr-client-secret
-      SSR_SESSION_SECRET: ssr-dev-session-secret
-      B2B_CLIENT_ID: b2b-client
-      B2B_CLIENT_SECRET: b2b-client-secret
-      GOOGLE_CLIENT_ID: your-google-client-id
-      GOOGLE_CLIENT_SECRET: your-google-client-secret
 
     steps:
       - uses: actions/checkout@v4
@@ -273,6 +254,8 @@ jobs:
         working-directory: apps/backend
         run: |
           cat <<EOF > .env
+          # NODE_ENV=test => requireAuth/requireRole pass-through (kolekcja Postman bez tokenow).
+          NODE_ENV=test
           POSTGRES_USER=${POSTGRES_USER}
           POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
           POSTGRES_DB=${POSTGRES_DB}
@@ -285,25 +268,6 @@ jobs:
           API_GATEWAY_PORT=${API_GATEWAY_PORT}
           REDIS_URL=${REDIS_URL}
           CACHE_TTL_SECONDS=${CACHE_TTL_SECONDS}
-          KC_BOOTSTRAP_ADMIN_USERNAME=${KC_BOOTSTRAP_ADMIN_USERNAME}
-          KC_BOOTSTRAP_ADMIN_PASSWORD=${KC_BOOTSTRAP_ADMIN_PASSWORD}
-          KC_DB_USER=${KC_DB_USER}
-          KC_DB_PASSWORD=${KC_DB_PASSWORD}
-          KC_DB_NAME=${KC_DB_NAME}
-          KEYCLOAK_REALM=${KEYCLOAK_REALM}
-          KEYCLOAK_INTERNAL_URL=${KEYCLOAK_INTERNAL_URL}
-          KEYCLOAK_JWKS_URI=${KEYCLOAK_JWKS_URI}
-          KEYCLOAK_ALLOWED_ISSUERS=${KEYCLOAK_ALLOWED_ISSUERS}
-          KEYCLOAK_AUDIENCE=${KEYCLOAK_AUDIENCE}
-          KC_ADMIN_CLIENT_ID=${KC_ADMIN_CLIENT_ID}
-          KC_ADMIN_CLIENT_SECRET=${KC_ADMIN_CLIENT_SECRET}
-          SSR_CLIENT_ID=${SSR_CLIENT_ID}
-          SSR_CLIENT_SECRET=${SSR_CLIENT_SECRET}
-          SSR_SESSION_SECRET=${SSR_SESSION_SECRET}
-          B2B_CLIENT_ID=${B2B_CLIENT_ID}
-          B2B_CLIENT_SECRET=${B2B_CLIENT_SECRET}
-          GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-          GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
           EOF
           # Pliki sekretow (gitignored) — docker-compose montuje je jako secrets.
           # Bez znaku konca linii, zgodnie z secrets/README.md.
@@ -313,7 +277,11 @@ jobs:
 
       - name: docker compose up (build + start)
         working-directory: apps/backend
-        run: docker compose up -d --build
+        # E2E (newman) testuje tylko kontrakt REST API, wiec stawiamy WYLACZNIE serwisy
+        # potrzebne kolekcji Postman. Pomijamy Keycloaka (+ keycloak-db, ~4 min zimny start)
+        # i klientow demo (frontend/ssr-client/analytics-worker) - kolekcja nie uzywa tokenow,
+        # a brak sekretow KC powodowal padanie keycloak-db (puste POSTGRES_PASSWORD => exit 1).
+        run: docker compose up -d --build postgres mongodb redis pg-service mongo-service api-gateway
 
       - name: Wait for API gateway
         run: |
