@@ -126,6 +126,10 @@ export async function createComment(req: Request, res: Response, next: NextFunct
     return res.status(400).json({ error: 'Validation Error', code: 'INVALID_POST_ID', details: 'Post ID must be a valid number.' });
   }
 
+  // Tozsamosc z tokenu (jezeli zalogowany) nadpisuje authorId z body przed walidacja -
+  // analogicznie do createPost; user komentuje tylko we wlasnym imieniu.
+  if (req.appUser) req.body = { ...req.body, authorId: req.appUser.id };
+
   let validatedComment;
   try {
     validatedComment = validateComment(req.body);
