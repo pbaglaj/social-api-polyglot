@@ -275,7 +275,10 @@ label { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
 .comment-children { margin: 8px 0 0 12px; padding-left: 0; display: flex; flex-direction: column; gap: 8px; }
 .depth-1, .depth-2, .depth-3, .depth-4 { border-left: 3px solid var(--accent-soft); }
 .comment-empty { color: var(--muted); font-size: 13px; }
-.comment-form { margin-top: 10px; display: grid; grid-template-columns: 1fr 140px auto; gap: 8px; }
+.comment-actions { margin-top: 6px; }
+.comment-form { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.comment-form input { flex: 1 1 auto; min-width: 200px; }
+.reply-banner { flex-basis: 100%; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 
 /* Admin */
 .create-user { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
@@ -293,6 +296,5 @@ label { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
   .layout { grid-template-columns: 1fr; }
   .sidebar { position: static; flex-direction: row; flex-wrap: wrap; }
   .nav-group { flex: 1 1 100%; }
-  .comment-form { grid-template-columns: 1fr; }
   .avatar-name { display: none; }
 }

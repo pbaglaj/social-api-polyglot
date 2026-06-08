@@ -116,7 +116,7 @@ export function CommentsPanel({ postId }: { postId: number }) {
   const { openProfile } = useNav();
   const [comments, setComments] = useState<Comment[]>([]);
   const [content, setContent] = useState('');
-  const [parentId, setParentId] = useState('');
+  const [replyTo, setReplyTo] = useState<number | null>(null);
   const [status, setStatus] = useState('');
 
   async function load() {
@@ -136,11 +136,12 @@ export function CommentsPanel({ postId }: { postId: number }) {
   async function add() {
     if (!content.trim()) return;
     const payload: Record<string, unknown> = { content };
-    if (parentId.trim()) payload.parentId = parseInt(parentId, 10);
+    // parentId dolaczamy tylko gdy odpowiadamy na konkretny komentarz (przycisk "Reply").
+    if (replyTo != null) payload.parentId = replyTo;
     try {
       await request(`/posts/${postId}/comments`, { method: 'POST', body: JSON.stringify(payload) });
       setContent('');
-      setParentId('');
+      setReplyTo(null);
       await load();
     } catch (e) {
       setStatus('Add error: ' + (e as Error).message);
@@ -165,10 +166,17 @@ export function CommentsPanel({ postId }: { postId: number }) {
           • Comment #{c.id}
         </div>
         <div className="comment-content">{c.content}</div>
+        <div className="comment-actions">
+          <button className="link-btn" onClick={() => setReplyTo(c.id)}>
+            Reply
+          </button>
+        </div>
         {byParent.has(String(c.id)) && <ul className="comment-children">{renderLevel(String(c.id), depth + 1)}</ul>}
       </li>
     ));
   };
+
+  const replyTarget = replyTo != null ? comments.find((c) => c.id === replyTo) : null;
 
   return (
     <div className="comments-panel">
@@ -176,10 +184,26 @@ export function CommentsPanel({ postId }: { postId: number }) {
         {comments.length === 0 ? <li className="comment-empty">No comments.</li> : renderLevel('root', 0)}
       </ul>
       <div className="comment-form">
-        <input placeholder="Write a comment…" value={content} onChange={(e) => setContent(e.target.value)} />
-        <input type="number" placeholder="parentId (optional)" value={parentId} onChange={(e) => setParentId(e.target.value)} />
+        {replyTo != null && (
+          <div className="reply-banner">
+            <span>
+              Replying to {replyTarget?.author?.username ?? `user-${replyTarget?.authorId ?? ''}`} (comment #{replyTo})
+            </span>
+            <button className="link-btn" onClick={() => setReplyTo(null)}>
+              Cancel
+            </button>
+          </div>
+        )}
+        <input
+          placeholder={replyTo != null ? 'Write a reply…' : 'Write a comment…'}
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void add();
+          }}
+        />
         <button className="btn-primary" onClick={() => void add()}>
-          Add
+          {replyTo != null ? 'Reply' : 'Add'}
         </button>
       </div>
       {status && <div className="status">{status}</div>}
