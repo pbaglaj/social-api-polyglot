@@ -26,7 +26,7 @@ export function Notifications({ userId }: { userId: number }) {
       const res = await request<{ notifications?: Notification[] }>(`/notifications/${userId}?${params.toString()}`);
       setItems(res?.notifications ?? []);
     } catch (e) {
-      setStatus('Błąd: ' + (e as Error).message);
+      setStatus('Error: ' + (e as Error).message);
     }
   }
 
@@ -40,17 +40,17 @@ export function Notifications({ userId }: { userId: number }) {
       await request(`/notifications/${id}`, { method: 'DELETE' });
       await load();
     } catch (e) {
-      setStatus('Błąd usuwania: ' + (e as Error).message);
+      setStatus('Delete error: ' + (e as Error).message);
     }
   }
 
   async function markAllRead() {
     try {
       const res = await request<{ markedAsRead?: number }>(`/notifications/${userId}/read-all`, { method: 'PATCH' });
-      setStatus(`Oznaczono ${res?.markedAsRead ?? 0} powiadomień.`);
+      setStatus(`Marked ${res?.markedAsRead ?? 0} notifications as read.`);
       await load();
     } catch (e) {
-      setStatus('Błąd: ' + (e as Error).message);
+      setStatus('Error: ' + (e as Error).message);
     }
   }
 
@@ -62,22 +62,22 @@ export function Notifications({ userId }: { userId: number }) {
         body: JSON.stringify({ userId, typeName: newType, message: newMessage.trim() }),
       });
       setNewMessage('');
-      setStatus('Utworzono powiadomienie.');
+      setStatus('Notification created.');
       await load();
     } catch (e) {
-      setStatus('Błąd: ' + (e as Error).message);
+      setStatus('Error: ' + (e as Error).message);
     }
   }
 
   return (
     <section className="panel" id="notifications">
-      <h2>Powiadomienia (Sequelize)</h2>
+      <h2>Notifications (Sequelize)</h2>
       <div className="controls">
         <label>
-          <input type="checkbox" checked={unreadOnly} onChange={(e) => setUnreadOnly(e.target.checked)} /> tylko nieprzeczytane
+          <input type="checkbox" checked={unreadOnly} onChange={(e) => setUnreadOnly(e.target.checked)} /> unread only
         </label>
-        <button onClick={() => void load()}>Odśwież</button>
-        <button onClick={() => void markAllRead()}>Oznacz wszystkie jako przeczytane</button>
+        <button onClick={() => void load()}>Refresh</button>
+        <button onClick={() => void markAllRead()}>Mark all as read</button>
       </div>
       <div className="row">
         <select value={newType} onChange={(e) => setNewType(e.target.value)}>
@@ -87,23 +87,23 @@ export function Notifications({ userId }: { userId: number }) {
             </option>
           ))}
         </select>
-        <input className="grow" placeholder="treść powiadomienia" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} />
-        <button onClick={() => void create()}>Utwórz</button>
+        <input className="grow" placeholder="notification message" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} />
+        <button onClick={() => void create()}>Create</button>
       </div>
       {status && <div className="status">{status}</div>}
       <ul>
-        {items.length === 0 && <li className="empty">Brak powiadomień.</li>}
+        {items.length === 0 && <li className="empty">No notifications.</li>}
         {items.map((n) => (
           <li key={n.id} className={'notification-item' + (n.isRead ? ' is-read' : '')}>
             <div className="notif-header">
-              {n.type?.icon ?? ''} <b>{n.type?.name ?? '?'}</b>{' '}
+              <b>{n.type?.name ?? '?'}</b>{' '}
               <small>
-                • {n.createdAt ? new Date(n.createdAt).toLocaleString() : ''} {n.isRead ? '• przeczytane' : '• NOWE'}
+                • {n.createdAt ? new Date(n.createdAt).toLocaleString() : ''} {n.isRead ? '• read' : '• NEW'}
               </small>
             </div>
             <div className="notif-body">{n.message}</div>
             <button className="danger delete-notif" onClick={() => void remove(n.id)}>
-              Usuń
+              Delete
             </button>
           </li>
         ))}

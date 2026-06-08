@@ -24,7 +24,7 @@ export function AdminPanel() {
       const res = await request<{ users?: KcUser[] }>('/admin/users' + q);
       setUsers(res?.users ?? []);
     } catch (e) {
-      setStatus('Błąd ładowania: ' + (e as Error).message);
+      setStatus('Loading error: ' + (e as Error).message);
     }
   }
 
@@ -35,16 +35,16 @@ export function AdminPanel() {
 
   async function createUser() {
     if (!cu.username.trim() || !cu.email.includes('@') || cu.password.length < 4) {
-      setStatus('Podaj username, poprawny email i hasło min. 4 znaki.');
+      setStatus('Provide a username, a valid email and a password (min 4 chars).');
       return;
     }
     try {
       await request('/admin/users', { method: 'POST', body: JSON.stringify(cu) });
-      setStatus(`Utworzono użytkownika ${cu.username}.`);
+      setStatus(`Created user ${cu.username}.`);
       setCu({ username: '', email: '', password: '', roles: ['User'] });
       await load();
     } catch (e) {
-      setStatus('Błąd tworzenia: ' + (e as Error).message);
+      setStatus('Create error: ' + (e as Error).message);
     }
   }
 
@@ -54,23 +54,23 @@ export function AdminPanel() {
         method: grant ? 'POST' : 'DELETE',
         body: JSON.stringify({ roles: [role] }),
       });
-      setStatus(`${grant ? 'Nadano' : 'Odebrano'} rolę ${role}.`);
+      setStatus(`${grant ? 'Granted' : 'Revoked'} role ${role}.`);
     } catch (e) {
-      setStatus('Błąd ról: ' + (e as Error).message);
+      setStatus('Role error: ' + (e as Error).message);
     }
   }
 
   async function resetPassword(id: string) {
-    const pwd = window.prompt('Nowe hasło (min. 4 znaki):');
+    const pwd = window.prompt('New password (min 4 chars):');
     if (!pwd || pwd.length < 4) return;
     try {
       await request(`/admin/users/${id}/password`, {
         method: 'PUT',
         body: JSON.stringify({ password: pwd, temporary: true }),
       });
-      setStatus('Hasło zresetowane (tymczasowe).');
+      setStatus('Password reset (temporary).');
     } catch (e) {
-      setStatus('Błąd resetu hasła: ' + (e as Error).message);
+      setStatus('Password reset error: ' + (e as Error).message);
     }
   }
 
@@ -83,21 +83,21 @@ export function AdminPanel() {
 
   return (
     <section className="panel admin" id="admin">
-      <h2>Panel administratora (Keycloak Admin REST API)</h2>
+      <h2>Admin panel (Keycloak Admin REST API)</h2>
 
       <div className="row">
-        <input placeholder="szukaj (username/email)" value={search} onChange={(e) => setSearch(e.target.value)} />
-        <button onClick={() => void load()}>Szukaj</button>
+        <input placeholder="search (username/email)" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <button onClick={() => void load()}>Search</button>
       </div>
 
       <fieldset className="create-user">
-        <legend>Załóż użytkownika</legend>
+        <legend>Create user</legend>
         <div className="row">
           <input placeholder="username" value={cu.username} onChange={(e) => setCu({ ...cu, username: e.target.value })} />
           <input placeholder="email" value={cu.email} onChange={(e) => setCu({ ...cu, email: e.target.value })} />
           <input
             type="password"
-            placeholder="hasło"
+            placeholder="password"
             value={cu.password}
             onChange={(e) => setCu({ ...cu, password: e.target.value })}
           />
@@ -108,18 +108,18 @@ export function AdminPanel() {
               <input type="checkbox" checked={cu.roles.includes(r)} onChange={() => toggleRole(r)} /> {r}
             </label>
           ))}
-          <button onClick={() => void createUser()}>Utwórz</button>
+          <button onClick={() => void createUser()}>Create</button>
         </div>
       </fieldset>
 
       {status && <div className="status">{status}</div>}
 
       <ul>
-        {users.length === 0 && <li className="empty">Brak użytkowników.</li>}
+        {users.length === 0 && <li className="empty">No users.</li>}
         {users.map((u) => (
           <li key={u.id} className="kc-user">
             <div>
-              <b>{u.username}</b> <small>{u.email}</small> {u.enabled === false && <em>(wyłączony)</em>}
+              <b>{u.username}</b> <small>{u.email}</small> {u.enabled === false && <em>(disabled)</em>}
             </div>
             <div className="post-actions">
               {ROLES.map((r) => (
@@ -130,7 +130,7 @@ export function AdminPanel() {
                   </button>
                 </span>
               ))}
-              <button onClick={() => void resetPassword(u.id)}>Reset hasła</button>
+              <button onClick={() => void resetPassword(u.id)}>Reset password</button>
             </div>
           </li>
         ))}

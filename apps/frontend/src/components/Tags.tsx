@@ -29,7 +29,7 @@ export function Tags({ isAdmin, isModerator }: { isAdmin: boolean; isModerator: 
       const res = await request<{ tags?: Tag[] }>(`/tags?${params.toString()}`);
       setTags(res?.tags ?? []);
     } catch (e) {
-      setStatus('Błąd ładowania: ' + (e as Error).message);
+      setStatus('Loading error: ' + (e as Error).message);
     }
   }
 
@@ -44,11 +44,11 @@ export function Tags({ isAdmin, isModerator }: { isAdmin: boolean; isModerator: 
         `/tags/${encodeURIComponent(tag)}/posts`,
       );
       alert(
-        `#${tag} — postów: ${res?.count ?? 0}\n\n` +
+        `#${tag} — posts: ${res?.count ?? 0}\n\n` +
           (res?.posts ?? []).map((p) => `#${p.id} (author ${p.authorId}): ${p.bodyPreview}`).join('\n'),
       );
     } catch (e) {
-      alert('Błąd: ' + (e as Error).message);
+      alert('Error: ' + (e as Error).message);
     }
   }
 
@@ -61,10 +61,10 @@ export function Tags({ isAdmin, isModerator }: { isAdmin: boolean; isModerator: 
       });
       setNewName('');
       setNewDesc('');
-      setStatus('Utworzono tag.');
+      setStatus('Tag created.');
       await load();
     } catch (e) {
-      setStatus('Błąd tworzenia: ' + (e as Error).message);
+      setStatus('Create error: ' + (e as Error).message);
     }
   }
 
@@ -77,18 +77,18 @@ export function Tags({ isAdmin, isModerator }: { isAdmin: boolean; isModerator: 
       });
       setAttachPostId('');
       setAttachTag('');
-      setStatus('Przypisano tag.');
+      setStatus('Tag attached.');
       await load();
     } catch (e) {
-      setStatus('Błąd przypisania: ' + (e as Error).message);
+      setStatus('Attach error: ' + (e as Error).message);
     }
   }
 
   return (
     <section className="panel" id="tags">
-      <h2>Tagi (Knex)</h2>
+      <h2>Tags (Knex)</h2>
       <div className="row">
-        <input placeholder="nazwa" value={name} onChange={(e) => setName(e.target.value)} />
+        <input placeholder="name" value={name} onChange={(e) => setName(e.target.value)} />
         <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
           <option value="usageCount">usageCount</option>
           <option value="name">name</option>
@@ -97,14 +97,14 @@ export function Tags({ isAdmin, isModerator }: { isAdmin: boolean; isModerator: 
           <option value="desc">desc</option>
           <option value="asc">asc</option>
         </select>
-        <button onClick={() => void load()}>Szukaj</button>
+        <button onClick={() => void load()}>Search</button>
       </div>
 
       {isAdmin && (
         <div className="row">
-          <input placeholder="nowy tag" value={newName} onChange={(e) => setNewName(e.target.value)} />
-          <input placeholder="opis (opcj.)" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
-          <button onClick={() => void createTag()}>Utwórz tag (Admin)</button>
+          <input placeholder="new tag" value={newName} onChange={(e) => setNewName(e.target.value)} />
+          <input placeholder="description (optional)" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
+          <button onClick={() => void createTag()}>Create tag (Admin)</button>
         </div>
       )}
 
@@ -112,13 +112,13 @@ export function Tags({ isAdmin, isModerator }: { isAdmin: boolean; isModerator: 
         <div className="row">
           <input placeholder="postId" value={attachPostId} onChange={(e) => setAttachPostId(e.target.value)} />
           <input placeholder="tag" value={attachTag} onChange={(e) => setAttachTag(e.target.value)} />
-          <button onClick={() => void attach()}>Przypisz tag</button>
+          <button onClick={() => void attach()}>Attach tag</button>
         </div>
       )}
 
       {status && <div className="status">{status}</div>}
       <ul>
-        {tags.length === 0 && <li className="empty">Brak tagów.</li>}
+        {tags.length === 0 && <li className="empty">No tags.</li>}
         {tags.map((t) => (
           <li key={t.name} className="tag-item">
             <div className="tag-header">
@@ -126,7 +126,7 @@ export function Tags({ isAdmin, isModerator }: { isAdmin: boolean; isModerator: 
             </div>
             {t.description && <div className="tag-desc">{t.description}</div>}
             <button className="show-tag-posts" onClick={() => void showPosts(t.name)}>
-              Posty z tym tagiem
+              Posts with this tag
             </button>
           </li>
         ))}
