@@ -1,0 +1,22 @@
+# --- Nakladka "optimized" na docker-compose.yml ---
+# Buduje lokalny obraz keycloaka z keycloak/Dockerfile (kc.sh build zapieczony
+# w obraz) i uruchamia `start --optimized`. Eliminuje to ~150s re-augmentacji
+# robionej przy kazdym starcie przez `start-dev` -> keycloak wstaje w kilka s.
+#
+# Cala reszta konfiguracji keycloaka (environment, ports, volumes, healthcheck,
+# depends_on, networks) jest DZIEDZICZONA z docker-compose.yml - tu nadpisujemy
+# tylko image/build/command.
+#
+# Uzycie (zamiast samego `docker compose up`):
+#   docker compose -f docker-compose.yml -f docker-compose.optimized.yml up -d --build
+#
+# Domyslny `start-dev` zostaje nietkniety - uruchamiany przez samo
+# `docker compose up` (bez tej nakladki).
+
+services:
+  keycloak:
+    image: project-p-baglaj/keycloak:${APP_VERSION:-dev}
+    build:
+      context: ./keycloak
+      dockerfile: Dockerfile
+    command: ["start", "--optimized", "--import-realm"]
