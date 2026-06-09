@@ -7,7 +7,7 @@ let connecting: Promise<RedisClientType> | null = null;
 // łączyć się z Redisem. Bez tego getRedis() wisiałby w nieskończoność na
 // reconnectStrategy, gdy host `redis` jest nieosiągalny (np. w CI jobie
 // pg-service, gdzie działa tylko Postgres) — co zawieszało testy jest.
-const REDIS_DISABLED =
+export const REDIS_DISABLED =
   process.env.NODE_ENV === 'test' || process.env.REDIS_DISABLED === 'true';
 
 export function getRedis(): Promise<RedisClientType> {

@@ -25,19 +25,19 @@ export function GoogleCalendar() {
   const [status, setStatus] = useState('');
 
   async function load() {
-    setStatus('Pobieranie z Google Calendar…');
+    setStatus('Fetching from Google Calendar…');
     setEvents([]);
     try {
       const res = await request<CalendarResponse>('/google/calendar');
       const items = res?.events ?? [];
       setEvents(items);
-      setStatus(items.length ? `Pobrano ${items.length} wydarzeń.` : 'Brak nadchodzących wydarzeń.');
+      setStatus(items.length ? `Fetched ${items.length} events.` : 'No upcoming events.');
     } catch (e) {
       const err = e as ApiError;
       if (err.code === 'GOOGLE_NOT_CONFIGURED') {
-        setStatus('Google nie jest powiązany: zaloguj się przez „Google" na ekranie Keycloak. ' + err.message);
+        setStatus('Google not linked: sign in with "Google" on the Keycloak screen. ' + err.message);
       } else {
-        setStatus('Błąd: ' + err.message);
+        setStatus('Error: ' + err.message);
       }
     }
   }
@@ -46,14 +46,14 @@ export function GoogleCalendar() {
     <section className="panel" id="google-calendar">
       <h2>Google Calendar (Identity Brokering)</h2>
       <div className="row">
-        <button onClick={() => void load()}>Pobierz nadchodzące wydarzenia</button>
+        <button onClick={() => void load()}>Get upcoming events</button>
       </div>
       {status && <div className="status">{status}</div>}
       <ul>
         {events.map((ev, i) => (
           <li key={i} className="feed-entry">
             <div className="post-header">
-              {ev.start ? new Date(ev.start).toLocaleString() : '(bez daty)'}
+              {ev.start ? new Date(ev.start).toLocaleString() : '(no date)'}
             </div>
             <div className="post-body">
               {ev.htmlLink ? (

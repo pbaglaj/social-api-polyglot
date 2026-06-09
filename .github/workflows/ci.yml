@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, project/oauth2-security]
   push:
-    branches: [main]
+    branches: [main, project/oauth2-security]
   workflow_dispatch:
 
 concurrency:
@@ -155,6 +155,36 @@ jobs:
         run: npm test
 
   # ---------------------------------------------------------------------------
+  # 3b. frontend (SPA) — typecheck (tsc) + build (vite).
+  # ---------------------------------------------------------------------------
+  frontend:
+    name: frontend (typecheck + build)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: apps/frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (tsc --noEmit + vite build)
+        run: npm run build
+
+  # ---------------------------------------------------------------------------
   # 4. Docker build — walidacja Dockerfile'i obu serwisow (bez pushowania).
   # ---------------------------------------------------------------------------
   docker-build:
@@ -211,6 +241,8 @@ jobs:
       PG_SERVICE_PORT: 3001
       MONGO_SERVICE_PORT: 3002
       API_GATEWAY_PORT: 8080
+      REDIS_URL: redis://redis:6379
+      CACHE_TTL_SECONDS: "30"
 
     steps:
       - uses: actions/checkout@v4
@@ -222,6 +254,8 @@ jobs:
         working-directory: apps/backend
         run: |
           cat <<EOF > .env
+          # NODE_ENV=test => requireAuth/requireRole pass-through (kolekcja Postman bez tokenow).
+          NODE_ENV=test
           POSTGRES_USER=${POSTGRES_USER}
           POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
           POSTGRES_DB=${POSTGRES_DB}
@@ -232,6 +266,8 @@ jobs:
           PG_SERVICE_PORT=${PG_SERVICE_PORT}
           MONGO_SERVICE_PORT=${MONGO_SERVICE_PORT}
           API_GATEWAY_PORT=${API_GATEWAY_PORT}
+          REDIS_URL=${REDIS_URL}
+          CACHE_TTL_SECONDS=${CACHE_TTL_SECONDS}
           EOF
           # Pliki sekretow (gitignored) — docker-compose montuje je jako secrets.
           # Bez znaku konca linii, zgodnie z secrets/README.md.
@@ -241,7 +277,11 @@ jobs:
 
       - name: docker compose up (build + start)
         working-directory: apps/backend
-        run: docker compose up -d --build
+        # E2E (newman) testuje tylko kontrakt REST API, wiec stawiamy WYLACZNIE serwisy
+        # potrzebne kolekcji Postman. Pomijamy Keycloaka (+ keycloak-db, ~4 min zimny start)
+        # i klientow demo (frontend/ssr-client/analytics-worker) - kolekcja nie uzywa tokenow,
+        # a brak sekretow KC powodowal padanie keycloak-db (puste POSTGRES_PASSWORD => exit 1).
+        run: docker compose up -d --build postgres mongodb redis pg-service mongo-service api-gateway
 
       - name: Wait for API gateway
         run: |
@@ -291,18 +331,20 @@ jobs:
   ci-passed:
     name: CI passed
     if: always()
-    needs: [pg-service, mongo-service, docker-build, e2e]
+    needs: [pg-service, mongo-service, frontend, docker-build, e2e]
     runs-on: ubuntu-latest
     steps:
       - name: Sprawdz wyniki wszystkich jobow
         run: |
           echo "pg-service     = ${{ needs.pg-service.result }}"
           echo "mongo-service  = ${{ needs.mongo-service.result }}"
+          echo "frontend       = ${{ needs.frontend.result }}"
           echo "docker-build   = ${{ needs.docker-build.result }}"
           echo "e2e            = ${{ needs.e2e.result }}"
           for r in \
             "${{ needs.pg-service.result }}" \
             "${{ needs.mongo-service.result }}" \
+            "${{ needs.frontend.result }}" \
             "${{ needs.docker-build.result }}" \
             "${{ needs.e2e.result }}"; do
             if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then

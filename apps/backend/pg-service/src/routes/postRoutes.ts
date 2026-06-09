@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createPost, listPosts, addReaction, deletePost, createComment, listComments } from '../controllers/postController.js';
+import { createPost, listPosts, addReaction, deletePost, updatePost, createComment, listComments } from '../controllers/postController.js';
 import { cacheGet } from '../middlewares/cache.js';
 import { requireAuth, requireRole, provisionUser } from '../middlewares/auth.js';
 
@@ -12,6 +12,7 @@ router.use(requireAuth, requireRole('User', 'Admin', 'Moderator'), provisionUser
 router.get('/', cacheGet('posts:list'), listPosts);
 router.post('/', createPost);
 router.post('/:id/reactions', addReaction);
+router.patch('/:id', updatePost); // tylko wlasciciel (sprawdzane w kontrolerze)
 router.delete('/:id', deletePost); // wlasciciel LUB Admin/Moderator (sprawdzane w kontrolerze)
 router.post('/:id/comments', createComment);
 router.get('/:id/comments', cacheGet('posts:comments'), listComments);

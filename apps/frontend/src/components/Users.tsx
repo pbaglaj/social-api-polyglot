@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useApi } from '../api';
+import { useNav } from '../nav';
 
 interface User {
   id: number;
@@ -7,12 +8,16 @@ interface User {
   email?: string;
 }
 
+const PAGE = 10; // domyslnie widocznych userow (zad. 1)
+
 export function Users() {
   const { request } = useApi();
+  const { openProfile } = useNav();
   const [users, setUsers] = useState<User[]>([]);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState('');
+  const [expanded, setExpanded] = useState(false);
 
   async function load() {
     const params = new URLSearchParams();
@@ -23,8 +28,9 @@ export function Users() {
       const res = await request<{ users?: User[] } | User[]>('/users' + (q ? '?' + q : ''));
       const list = Array.isArray(res) ? res : (res?.users ?? []);
       setUsers(list);
+      setExpanded(false);
     } catch (e) {
-      setStatus('Błąd ładowania: ' + (e as Error).message);
+      setStatus('Loading error: ' + (e as Error).message);
     }
   }
 
@@ -37,44 +43,71 @@ export function Users() {
     try {
       // followerId nadawany z tokenu po stronie backendu.
       await request(`/users/${id}/follow`, { method: 'POST', body: '{}' });
-      setStatus(`Obserwujesz użytkownika #${id}.`);
+      setStatus(`You are now following user #${id}.`);
     } catch (e) {
-      setStatus('Błąd follow: ' + (e as Error).message);
+      setStatus('Follow error: ' + (e as Error).message);
     }
   }
 
   async function unfollow(id: number) {
     try {
       await request(`/users/${id}/follow`, { method: 'DELETE', body: '{}' });
-      setStatus(`Przestałeś obserwować #${id}.`);
+      setStatus(`You unfollowed user #${id}.`);
     } catch (e) {
-      setStatus('Błąd unfollow: ' + (e as Error).message);
+      setStatus('Unfollow error: ' + (e as Error).message);
     }
   }
 
+  const visible = expanded ? users : users.slice(0, PAGE);
+
   return (
     <section className="panel">
-      <h2>Użytkownicy</h2>
+      <h2>Users</h2>
       <div className="row">
         <input placeholder="username" value={username} onChange={(e) => setUsername(e.target.value)} />
         <input placeholder="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <button onClick={() => void load()}>Szukaj</button>
+        <button onClick={() => void load()}>Search</button>
       </div>
       {status && <div className="status">{status}</div>}
-      <ul id="users">
-        {users.length === 0 && <li className="empty">Brak użytkowników.</li>}
-        {users.map((u) => (
-          <li key={u.id}>
-            <span>
-              <b>#{u.id}</b> {u.username ?? u.email ?? 'user'} <small>{u.email ?? ''}</small>
-            </span>
-            <button onClick={() => void follow(u.id)}>Follow</button>
-            <button className="danger" onClick={() => void unfollow(u.id)}>
-              Unfollow
-            </button>
-          </li>
-        ))}
+
+      <ul className="list">
+        {users.length === 0 && <li className="empty">No users.</li>}
+        {visible.map((u) => {
+          const name = u.username ?? u.email ?? 'user';
+          return (
+            <li key={u.id} className="user-row">
+              <div className="user-info">
+                <button className="avatar" title={`Profile: ${name}`} onClick={() => openProfile(u.id)}>
+                  {name[0]?.toUpperCase() ?? '?'}
+                </button>
+                <div className="user-text">
+                  <div className="user-name">
+                    <button className="link-btn" onClick={() => openProfile(u.id)}>
+                      {name}
+                    </button>{' '}
+                    <span className="uid">#{u.id}</span>
+                  </div>
+                  {u.email && <div className="user-email">{u.email}</div>}
+                </div>
+              </div>
+              <div className="user-actions">
+                <button className="btn-primary" onClick={() => void follow(u.id)}>
+                  Follow
+                </button>
+                <button onClick={() => void unfollow(u.id)}>Unfollow</button>
+              </div>
+            </li>
+          );
+        })}
       </ul>
+
+      {users.length > PAGE && (
+        <div className="expand-bar">
+          <button onClick={() => setExpanded((v) => !v)}>
+            {expanded ? 'Show less' : `Show more (all ${users.length})`}
+          </button>
+        </div>
+      )}
     </section>
   );
 }
