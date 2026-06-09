@@ -183,6 +183,10 @@ textarea { resize: vertical; width: 100%; }
 .post-stats { font-size: 13px; color: var(--muted); padding-bottom: 8px; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
 .post-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding-top: 4px; }
 .post-actions .reaction-select { margin-left: auto; }
+.post-edited { color: var(--muted); font-style: italic; }
+.post-edit { margin: 8px 0 12px; }
+.post-edit textarea { min-height: 64px; }
+.post-edit-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
 
 /* --------------------------------------------------------------- Lists */
 ul { list-style: none; padding-left: 0; margin: 0; }

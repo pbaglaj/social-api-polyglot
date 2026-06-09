@@ -7,6 +7,7 @@ export interface Post {
   authorId: number;
   bodyPreview: string;
   createdAt?: string;
+  editedAt?: string | null; // niepuste => post byl edytowany (dopisek "edited")
   author?: { username?: string };
   _count?: { reactions?: number };
 }
@@ -38,9 +39,13 @@ export function PostCard({
   const [reactionType, setReactionType] = useState('like');
   const [openComments, setOpenComments] = useState(false);
   const [status, setStatus] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(post.bodyPreview);
 
   const authorName = post.author?.username ?? `user-${post.authorId}`;
   const canDelete = isPrivileged || post.authorId === currentUserId;
+  // Edycja tylko dla wlasciciela posta (nie dla Admina/Moderatora).
+  const canEdit = post.authorId === currentUserId;
 
   async function react() {
     try {
@@ -61,6 +66,24 @@ export function PostCard({
     }
   }
 
+  function startEdit() {
+    setDraft(post.bodyPreview);
+    setStatus('');
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    const body = draft.trim();
+    if (!body) return;
+    try {
+      await request(`/posts/${post.id}`, { method: 'PATCH', body: JSON.stringify({ bodyPreview: body }) });
+      setEditing(false);
+      onChanged();
+    } catch (e) {
+      setStatus('Edit error: ' + (e as Error).message);
+    }
+  }
+
   return (
     <article className="post-card">
       <div className="post-card-head">
@@ -73,11 +96,29 @@ export function PostCard({
           </button>
           <div className="post-meta">
             #{post.id} {post.createdAt ? `• ${new Date(post.createdAt).toLocaleString()}` : ''}
+            {post.editedAt && <span className="post-edited" title={`Edited ${new Date(post.editedAt).toLocaleString()}`}> • edited</span>}
           </div>
         </div>
       </div>
 
-      <div className="post-body">{post.bodyPreview}</div>
+      {editing ? (
+        <div className="post-edit">
+          <textarea
+            value={draft}
+            maxLength={255}
+            onChange={(e) => setDraft(e.target.value)}
+            autoFocus
+          />
+          <div className="post-edit-actions">
+            <button className="btn-primary" disabled={!draft.trim()} onClick={() => void saveEdit()}>
+              Save
+            </button>
+            <button onClick={() => setEditing(false)}>Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <div className="post-body">{post.bodyPreview}</div>
+      )}
 
       <div className="post-stats">{post._count?.reactions ?? 0} reactions</div>
 
@@ -86,6 +127,7 @@ export function PostCard({
         <button onClick={() => setOpenComments((v) => !v)}>
           {openComments ? 'Hide comments' : 'Comments'}
         </button>
+        {canEdit && !editing && <button onClick={startEdit}>Edit</button>}
         {canDelete && (
           <button className="danger" onClick={() => void remove()}>
             Delete
