@@ -9,9 +9,6 @@
 #
 # Uzycie (zamiast samego `docker compose up`):
 #   docker compose -f docker-compose.yml -f docker-compose.optimized.yml up -d --build
-#
-# Domyslny `start-dev` zostaje nietkniety - uruchamiany przez samo
-# `docker compose up` (bez tej nakladki).
 
 services:
   keycloak:
