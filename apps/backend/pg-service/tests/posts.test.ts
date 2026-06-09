@@ -238,4 +238,55 @@ describe('Post Routes Tests', () => {
       expect(txSpy).toHaveBeenCalled();
     });
   });
+
+  // ============== PATCH /api/posts/:id — edycja przez właściciela ==============
+  describe('PATCH /api/posts/:id', () => {
+    it('zwraca 400 dla niepoprawnego postId', async () => {
+      const res = await request(app).patch('/api/posts/abc').send({ requesterId: 1, bodyPreview: 'x' });
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('INVALID_POST_ID');
+    });
+
+    it('zwraca 400 gdy brak tożsamości requestera', async () => {
+      const res = await request(app).patch('/api/posts/5').send({ bodyPreview: 'x' });
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('INVALID_REQUESTER_ID');
+    });
+
+    it('zwraca 400 gdy bodyPreview jest pusty', async () => {
+      const res = await request(app).patch('/api/posts/5').send({ requesterId: 1, bodyPreview: '   ' });
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('VALIDATION_FAILED');
+    });
+
+    it('zwraca 404 gdy post nie istnieje', async () => {
+      jest.spyOn(prisma.post, 'findUnique').mockResolvedValue(null);
+      const res = await request(app).patch('/api/posts/9999').send({ requesterId: 1, bodyPreview: 'x' });
+      expect(res.status).toBe(404);
+      expect(res.body.code).toBe('POST_NOT_FOUND');
+    });
+
+    it('zwraca 403 gdy requester nie jest autorem', async () => {
+      jest.spyOn(prisma.post, 'findUnique').mockResolvedValue({ id: 5, authorId: 99 } as any);
+      const res = await request(app).patch('/api/posts/5').send({ requesterId: 1, bodyPreview: 'x' });
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe('NOT_POST_OWNER');
+    });
+
+    it('aktualizuje treść i ustawia editedAt dla właściciela', async () => {
+      jest.spyOn(prisma.post, 'findUnique').mockResolvedValue({ id: 5, authorId: 1 } as any);
+      const updateSpy = jest.spyOn(prisma.post, 'update').mockResolvedValue({
+        id: 5, authorId: 1, bodyPreview: 'updated', createdAt: new Date(),
+        editedAt: new Date(), author: { username: 'u' }, _count: { reactions: 0 }
+      } as any);
+      const res = await request(app).patch('/api/posts/5').send({ requesterId: 1, bodyPreview: 'updated' });
+      expect(res.status).toBe(200);
+      expect(res.body.bodyPreview).toBe('updated');
+      expect(res.body.editedAt).toBeTruthy();
+      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({
+        where: { id: 5 },
+        data: expect.objectContaining({ bodyPreview: 'updated', editedAt: expect.any(Date) }),
+      }));
+    });
+  });
 });

@@ -91,6 +91,50 @@ paths:
                   author:
                     username: "janedoe"
   /posts/{id}:
+    patch:
+      summary: Edycja treści postu (tylko właściciel)
+      description: |
+        Aktualizuje `bodyPreview` postu i ustawia znacznik `editedAt`.
+        Edytować może wyłącznie autor postu (403 dla pozostałych). Treść
+        żyje tylko w PG — RichPost w Mongo nie przechowuje tekstu, więc
+        edycja nie wymaga synchronizacji między bazami.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - bodyPreview
+              properties:
+                bodyPreview:
+                  type: string
+                  example: "Poprawiona treść postu"
+      responses:
+        '200':
+          description: Zaktualizowano
+          content:
+            application/json:
+              example:
+                id: 1
+                authorId: 1
+                bodyPreview: "Poprawiona treść postu"
+                createdAt: "2026-05-08T12:00:00.000Z"
+                editedAt: "2026-06-09T09:58:00.000Z"
+                author:
+                  username: "janedoe"
+        '400':
+          description: Złe żądanie (błąd walidacji)
+        '403':
+          description: Brak uprawnień (nie jesteś autorem postu)
+        '404':
+          description: Post nie istnieje
     delete:
       summary: Usuwa zadany post z bazy PG oraz odpala usuwanie kaskadowe z Mongo (lub Job)
       parameters:
