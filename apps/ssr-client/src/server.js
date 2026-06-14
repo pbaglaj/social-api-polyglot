@@ -82,16 +82,24 @@ app.get('/', async (req, res) => {
 
 // --- Authorization Code: front-channel redirect na Keycloak (przegladarka) ---
 app.get('/login', (req, res) => {
-  const state = crypto.randomBytes(16).toString('hex');
-  req.session.oauthState = state;
-  const params = new URLSearchParams({
-    client_id: CLIENT_ID,
-    response_type: 'code',
-    redirect_uri: REDIRECT_URI,
-    scope: 'openid profile email',
-    state,
+  // Nowa sesja na starcie logowania - zapobiega session fixation (CWE-384):
+  // ewentualny podstawiony identyfikator sesji jest porzucany, zanim zapiszemy
+  // stan OAuth, ktory pozniej stanie sie sesja zalogowanego uzytkownika.
+  req.session.regenerate((err) => {
+    if (err) {
+      return res.status(500).render('error', { message: 'Nie udalo sie utworzyc nowej sesji.' });
+    }
+    const state = crypto.randomBytes(16).toString('hex');
+    req.session.oauthState = state;
+    const params = new URLSearchParams({
+      client_id: CLIENT_ID,
+      response_type: 'code',
+      redirect_uri: REDIRECT_URI,
+      scope: 'openid profile email',
+      state,
+    });
+    res.redirect(`${PUBLIC_REALM}/protocol/openid-connect/auth?${params.toString()}`);
   });
-  res.redirect(`${PUBLIC_REALM}/protocol/openid-connect/auth?${params.toString()}`);
 });
 
 // --- Callback: back-channel wymiana code->token (sekret klienta) ---
