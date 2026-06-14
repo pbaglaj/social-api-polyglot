@@ -27,6 +27,7 @@ const PUBLIC_REALM = `${KC_PUBLIC_URL}/realms/${REALM}`;
 const INTERNAL_REALM = `${KC_INTERNAL_URL}/realms/${REALM}`;
 
 const app = express();
+app.set('trust proxy', 1);
 app.set('view engine', 'ejs');
 app.set('views', new URL('../views', import.meta.url).pathname);
 app.use(
@@ -34,7 +35,7 @@ app.use(
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: { httpOnly: true, sameSite: 'lax', maxAge: 60 * 60 * 1000 },
+    cookie: { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 60 * 60 * 1000 },
   }),
 );
 
