@@ -33,7 +33,7 @@ export async function follow(req: Request, res: Response, next: NextFunction): P
     return;
   }
 
-  const followerIdParam = req.body?.followerId;
+  const followerIdParam = req.appUser ? req.appUser.id : req.body?.followerId;
   const followerId = typeof followerIdParam === 'string' ? parseInt(followerIdParam, 10) : Number(followerIdParam);
 
   if (!Number.isInteger(followerId)) {
@@ -81,7 +81,7 @@ export async function unfollow(req: Request, res: Response, next: NextFunction):
     return;
   }
 
-  const followerIdParam = req.body?.followerId;
+  const followerIdParam = req.appUser ? req.appUser.id : req.body?.followerId;
   const followerId = typeof followerIdParam === 'string' ? parseInt(followerIdParam, 10) : Number(followerIdParam);
 
   if (!Number.isInteger(followerId)) {

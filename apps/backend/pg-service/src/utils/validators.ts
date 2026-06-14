@@ -30,6 +30,20 @@ export function validatePost(data: any): { authorId: number, bodyPreview: string
   };
 }
 
+// Edycja posta: walidujemy wylacznie nowa tresc (autorstwo wynika z tokenu/wlasciciela,
+// nie zmieniamy go przy edycji). Te same reguly co dla bodyPreview przy tworzeniu.
+export function validatePostEdit(data: any): { bodyPreview: string } {
+  if (!data.bodyPreview || typeof data.bodyPreview !== 'string' || data.bodyPreview.trim() === '') {
+    throw new ValidationError('Treść posta nie może być pusta.');
+  }
+
+  if (data.bodyPreview.length > 255) {
+    throw new ValidationError('Treść musi mieć od 1 do 255 znaków.');
+  }
+
+  return { bodyPreview: data.bodyPreview };
+}
+
 export function validateComment(data: any): { authorId: number, content: string, parentId?: number | null } {
   if (!data.authorId || typeof data.authorId !== 'number') {
     throw new ValidationError('Id autora musi być liczbą.');

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Social Polyglot — SSR (landing)</title>
+  <style>
+    body { font-family: Segoe UI, Arial, sans-serif; margin: 0; background: #f4f6f8; color: #1f2937; }
+    header { background: #fff; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 0 rgba(0,0,0,.06); }
+    a.btn { background: #2b6cb0; color: #fff; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 14px; }
+    a.btn.danger { background: #b91c1c; }
+    main { max-width: 960px; margin: 0 auto; padding: 20px; }
+    .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+    .card { background: #fff; border-radius: 8px; padding: 14px; box-shadow: 0 1px 2px rgba(16,24,40,.05); }
+    .post { padding: 10px 0; border-bottom: 1px solid #eee; }
+    .meta { font-size: 12px; color: #6b7280; }
+    .err { background: #fee2e2; color: #991b1b; padding: 10px; border-radius: 6px; }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h2>Social Polyglot — SSR landing</h2>
+    <div>
+      <% if (user) { %>
+        <span>Zalogowany: <b><%= user.username %></b></span>
+        <a class="btn" href="/dashboard">Dashboard</a>
+        <a class="btn danger" href="/logout">Wyloguj</a>
+      <% } else { %>
+        <a class="btn" href="/login">Zaloguj przez Keycloak</a>
+      <% } %>
+    </div>
+  </header>
+  <main>
+    <p class="meta">Ta strona renderowana jest po stronie serwera. Publiczne dane pobiera przez token
+      <b>service-accountu</b> klienta <code>ssr-client</code> (Client Credentials, rola User).</p>
+    <% if (error) { %><div class="err">Błąd pobierania danych: <%= error %></div><% } %>
+    <div class="grid">
+      <section class="card">
+        <h3>Najnowsze posty</h3>
+        <% if (!posts.length) { %><p class="meta">Brak postów.</p><% } %>
+        <% posts.slice(0, 20).forEach(function (p) { %>
+          <div class="post">
+            <div class="meta">#<%= p.id %> • autor: <%= (p.author && p.author.username) || ('user-' + p.authorId) %></div>
+            <div><%= p.bodyPreview %></div>
+          </div>
+        <% }); %>
+      </section>
+      <section class="card">
+        <h3>Użytkownicy</h3>
+        <% if (!users.length) { %><p class="meta">Brak.</p><% } %>
+        <% users.slice(0, 30).forEach(function (u) { %>
+          <div class="post"><b>#<%= u.id %></b> <%= u.username || u.email %></div>
+        <% }); %>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

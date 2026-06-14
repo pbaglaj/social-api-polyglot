@@ -11,6 +11,7 @@ model User {
   id          Int      @id @default(autoincrement())
   username    String   @unique
   email       String   @unique
+  keycloakId  String?  @unique
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now())
 
@@ -45,6 +46,7 @@ model Post {
   authorId    Int
   bodyPreview String   @db.VarChar(255)
   createdAt   DateTime @default(now())
+  editedAt    DateTime? // ustawiane przy edycji tresci; NULL => post nigdy nie edytowany
 
   author      User     @relation(fields: [authorId], references: [id])
   comments    Comment[]

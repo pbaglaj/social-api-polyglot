@@ -57,8 +57,12 @@ export async function seedDatabase(dbClient: any) {
   console.log('Generated random posts, comments and relationships.');
 }
 
-// Skrypt uruchamia się tylko, jeśli nie jesteśmy w środowisku testowym (Jesta)
-if (process.env.NODE_ENV !== 'test') {
+// Auto-run tylko gdy skrypt jest odpalany bezposrednio (prisma db seed), a NIE
+// gdy seedDatabase jest importowane przez testy Jesta (seed.test.ts) - tam liczy
+// sie mock, nie realny zapis. Guard patrzy na JEST_WORKER_ID (ustawiany przez Jest),
+// bo wczesniejszy warunek NODE_ENV !== 'test' blokowal seed takze w E2E (docker),
+// gdzie NODE_ENV=test wlacza pass-through auth -> baza zostawala pusta (FK 500).
+if (!process.env.JEST_WORKER_ID) {
   seedDatabase(prisma)
     .catch((e) => {
       console.error('Error during seeding:', e);

@@ -1,11 +1,15 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { Prisma } from '@prisma/client';
 import prisma from '../config/prisma.js';
-import { validatePost, validateComment } from '../utils/validators.js';
-import { createPostWithFanout, upsertReaction, deletePostCascade } from '../services/postService.js';
+import { validatePost, validatePostEdit, validateComment } from '../utils/validators.js';
+import { createPostWithFanout, upsertReaction, deletePostCascade, updatePostBody } from '../services/postService.js';
 import { invalidatePrefix } from '../middlewares/cache.js';
 
 export async function createPost(req: Request, res: Response, next: NextFunction) {
+  // Tozsamosc z tokenu (jezeli zalogowany) nadpisuje authorId z body -
+  // user moze tworzyc posty tylko we wlasnym imieniu.
+  if (req.appUser) req.body = { ...req.body, authorId: req.appUser.id };
+
   let validatedData;
   try {
     validatedData = validatePost(req.body);
@@ -68,7 +72,8 @@ export async function addReaction(req: Request, res: Response, next: NextFunctio
     return res.status(400).json({ error: 'Validation Error', code: 'INVALID_POST_ID', details: 'Post ID must be a valid number.' });
   }
 
-  const { userId, type } = req.body;
+  const userId = req.appUser ? req.appUser.id : req.body.userId;
+  const { type } = req.body;
 
   try {
     const reaction = await upsertReaction(postId, userId, type);
@@ -88,14 +93,16 @@ export async function deletePost(req: Request, res: Response, next: NextFunction
     return res.status(400).json({ error: 'Validation Error', code: 'INVALID_POST_ID', details: 'Post ID must be a valid number.' });
   }
 
-  const requesterIdRaw = req.body?.requesterId ?? req.body?.userId ?? req.body?.authorId ?? req.body?.followerId;
+  // Wlasciciel posta z tokenu; Admin/Moderator moze kasowac dowolny post.
+  const privileged = (req.roles ?? []).some((r) => r === 'Admin' || r === 'Moderator');
+  const requesterIdRaw = req.appUser ? req.appUser.id : (req.body?.requesterId ?? req.body?.userId ?? req.body?.authorId ?? req.body?.followerId);
   const requesterId = typeof requesterIdRaw === 'string' ? parseInt(requesterIdRaw, 10) : Number(requesterIdRaw);
   if (!Number.isInteger(requesterId)) {
     return res.status(400).json({ error: 'Validation Error', code: 'INVALID_REQUESTER_ID', details: 'Requester ID must be a valid number.' });
   }
 
   try {
-    const result = await deletePostCascade(postId, requesterId);
+    const result = await deletePostCascade(postId, requesterId, privileged);
     if (result.status === 'not_found') {
       return res.status(404).json({ error: 'Not Found', code: 'POST_NOT_FOUND', details: 'Post not found.' });
     }
@@ -103,6 +110,45 @@ export async function deletePost(req: Request, res: Response, next: NextFunction
       return res.status(403).json({ error: 'Forbidden', code: 'NOT_POST_OWNER', details: 'Only the post owner can delete this post.' });
     }
     res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Edycja posta przez wlasciciela (PATCH /api/posts/:id). Tylko tresc; autorstwa nie ruszamy.
+export async function updatePost(req: Request, res: Response, next: NextFunction) {
+  const idParam = req.params.id;
+  if (typeof idParam !== 'string') {
+    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_POST_ID', details: 'Invalid post ID format.' });
+  }
+  const postId = parseInt(idParam, 10);
+  if (isNaN(postId)) {
+    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_POST_ID', details: 'Post ID must be a valid number.' });
+  }
+
+  // Tozsamosc z tokenu; w trybie test (auth pass-through) bierzemy ja z body.
+  const requesterIdRaw = req.appUser ? req.appUser.id : (req.body?.requesterId ?? req.body?.authorId ?? req.body?.userId);
+  const requesterId = typeof requesterIdRaw === 'string' ? parseInt(requesterIdRaw, 10) : Number(requesterIdRaw);
+  if (!Number.isInteger(requesterId)) {
+    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_REQUESTER_ID', details: 'Requester ID must be a valid number.' });
+  }
+
+  let validated;
+  try {
+    validated = validatePostEdit(req.body);
+  } catch (error) {
+    return next(error);
+  }
+
+  try {
+    const result = await updatePostBody(postId, requesterId, validated.bodyPreview);
+    if (result.status === 'not_found') {
+      return res.status(404).json({ error: 'Not Found', code: 'POST_NOT_FOUND', details: 'Post not found.' });
+    }
+    if (result.status === 'forbidden') {
+      return res.status(403).json({ error: 'Forbidden', code: 'NOT_POST_OWNER', details: 'Only the post owner can edit this post.' });
+    }
+    res.json(result.post);
   } catch (error) {
     next(error);
   }
@@ -119,6 +165,10 @@ export async function createComment(req: Request, res: Response, next: NextFunct
     return res.status(400).json({ error: 'Validation Error', code: 'INVALID_POST_ID', details: 'Post ID must be a valid number.' });
   }
 
+  // Tozsamosc z tokenu (jezeli zalogowany) nadpisuje authorId z body przed walidacja -
+  // analogicznie do createPost; user komentuje tylko we wlasnym imieniu.
+  if (req.appUser) req.body = { ...req.body, authorId: req.appUser.id };
+
   let validatedComment;
   try {
     validatedComment = validateComment(req.body);
@@ -126,7 +176,8 @@ export async function createComment(req: Request, res: Response, next: NextFunct
     return next(error);
   }
 
-  const { authorId, content, parentId } = validatedComment;
+  const { content, parentId } = validatedComment;
+  const authorId = req.appUser ? req.appUser.id : validatedComment.authorId;
 
   try {
     const comment = await prisma.comment.create({

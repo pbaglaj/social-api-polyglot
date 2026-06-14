@@ -1,0 +1,181 @@
+{
+  "realm": "SocialPolyglot",
+  "enabled": true,
+  "displayName": "Social Polyglot",
+  "registrationAllowed": true,
+  "registrationEmailAsUsername": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "editUsernameAllowed": false,
+  "sslRequired": "none",
+  "accessTokenLifespan": 900,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "otpPolicyLookAheadWindow": 1,
+
+  "roles": {
+    "realm": [
+      { "name": "Admin", "description": "Pelny dostep: zarzadzanie userami, tagami, kasowanie dowolnych postow." },
+      { "name": "User", "description": "Standardowy uzytkownik: czyta feed, tworzy i edytuje wlasne posty." },
+      { "name": "Moderator", "description": "Moderator tresci: kasowanie postow i komentarzy." },
+      { "name": "analytics", "description": "Rola serwisowa (M2M): dostep tylko do endpointow analitycznych." }
+    ]
+  },
+
+  "defaultRoles": ["offline_access", "uma_authorization", "User"],
+
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "admin@social.local",
+      "firstName": "Ada",
+      "lastName": "Admin",
+      "credentials": [{ "type": "password", "value": "admin", "temporary": false }],
+      "realmRoles": ["Admin", "User"]
+    },
+    {
+      "username": "user",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "user@social.local",
+      "firstName": "Ula",
+      "lastName": "User",
+      "credentials": [{ "type": "password", "value": "user", "temporary": false }],
+      "realmRoles": ["User"]
+    },
+    {
+      "username": "mod",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "mod@social.local",
+      "firstName": "Marek",
+      "lastName": "Moderator",
+      "credentials": [{ "type": "password", "value": "mod", "temporary": false }],
+      "realmRoles": ["Moderator", "User"]
+    },
+    {
+      "username": "service-account-b2b-client",
+      "enabled": true,
+      "serviceAccountClientId": "b2b-client",
+      "realmRoles": ["analytics"]
+    },
+    {
+      "username": "service-account-ssr-client",
+      "enabled": true,
+      "serviceAccountClientId": "ssr-client",
+      "realmRoles": ["User"]
+    },
+    {
+      "username": "service-account-backend-admin",
+      "enabled": true,
+      "serviceAccountClientId": "backend-admin",
+      "clientRoles": {
+        "realm-management": ["manage-users", "view-users", "query-users", "view-realm"]
+      }
+    }
+  ],
+
+  "clients": [
+    {
+      "clientId": "spa-client",
+      "name": "Client nr 1 - SPA (React, Authorization Code + PKCE)",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:5173/*",
+        "http://localhost:8080/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5173",
+        "http://localhost:8080",
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/*##http://localhost:8080/*"
+      },
+      "fullScopeAllowed": true
+    },
+    {
+      "clientId": "ssr-client",
+      "name": "Client nr 2 - SSR (Authorization Code, Confidential)",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "ssr-client-secret",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "redirectUris": [
+        "http://localhost:4000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:4000"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:4000/*"
+      },
+      "fullScopeAllowed": true
+    },
+    {
+      "clientId": "b2b-client",
+      "name": "Client nr 3 - Backend-2-Backend (Client Credentials)",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "b2b-client-secret",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": true
+    },
+    {
+      "clientId": "backend-admin",
+      "name": "Backend -> Keycloak Admin REST API (Client Credentials)",
+      "description": "Uzywany przez pg-service do zarzadzania userami (zakladanie konta, przypisywanie rol). Minimalne uprawnienia: realm-management.",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "backend-admin-secret",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": true
+    }
+  ],
+
+  "smtpServer": {},
+
+  "identityProviders": [
+    {
+      "alias": "google",
+      "providerId": "google",
+      "enabled": true,
+      "storeToken": true,
+      "addReadTokenRoleOnCreate": true,
+      "trustEmail": true,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "config": {
+        "clientId": "${GOOGLE_CLIENT_ID}",
+        "clientSecret": "${GOOGLE_CLIENT_SECRET}",
+        "defaultScope": "openid email profile https://www.googleapis.com/auth/calendar.readonly",
+        "useJwksUrl": "true",
+        "syncMode": "IMPORT"
+      }
+    }
+  ]
+}

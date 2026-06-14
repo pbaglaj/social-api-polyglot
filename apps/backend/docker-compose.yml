@@ -1,3 +1,9 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgres:15-alpine
@@ -16,13 +22,12 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
     cpus: 1.0
     mem_limit: 512m
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
 
   mongodb:
     image: mongo:6
@@ -37,16 +42,16 @@ services:
       - internal
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
-      interval: 5s
-      timeout: 5s
+      interval: 10s
+      timeout: 10s
       retries: 5
+      start_period: 40s
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
     cpus: 1.0
     mem_limit: 512m
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
 
   redis:
     image: redis:7-alpine
@@ -60,13 +65,73 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
     cpus: 0.5
     mem_limit: 256m
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
+
+  keycloak-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${KC_DB_USER}
+      POSTGRES_PASSWORD: ${KC_DB_PASSWORD}
+      POSTGRES_DB: ${KC_DB_NAME}
+    volumes:
+      - keycloakdata:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${KC_DB_USER} -d ${KC_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    cpus: 0.5
+    mem_limit: 256m
+    logging: *default-logging
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.1
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/${KC_DB_NAME}
+      KC_DB_USERNAME: ${KC_DB_USER}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_PROXY_HEADERS: "xforwarded"
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    ports:
+      - "${KEYCLOAK_PORT:-8090}:8080"
+    networks:
+      - edge
+      - internal
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9000; printf 'GET /health/ready HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3; grep -q '200 OK' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 200s
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    mem_limit: 1024m
+    stop_grace_period: 30s
+    logging: *default-logging
 
   pg-service:
     image: project-p-baglaj/pg-service:${APP_VERSION:-dev}
@@ -74,38 +139,48 @@ services:
       context: ./pg-service
       dockerfile: Dockerfile
     environment:
+      NODE_ENV: ${NODE_ENV:-}
       DATABASE_URL: ${DATABASE_URL}
       PORT: ${PG_SERVICE_PORT}
       REDIS_URL: ${REDIS_URL}
       CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS}
+      # OAuth2 / walidacja JWT (Keycloak)
+      KEYCLOAK_JWKS_URI: ${KEYCLOAK_JWKS_URI}
+      KEYCLOAK_ALLOWED_ISSUERS: ${KEYCLOAK_ALLOWED_ISSUERS}
+      KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE}
+      # Keycloak Admin REST API (zarzadzanie userami przez backend)
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KC_ADMIN_CLIENT_ID: ${KC_ADMIN_CLIENT_ID}
+      KC_ADMIN_CLIENT_SECRET: ${KC_ADMIN_CLIENT_SECRET}
     networks:
       - internal
+      - edge
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"const http=require('http'); const port=process.env.PORT||process.env.PG_SERVICE_PORT||3001; const req=http.get({host:'127.0.0.1', port: port, path:'/health', timeout:2000}, res => { if (res.statusCode >= 200 && res.statusCode < 500) process.exit(0); else process.exit(1); }); req.on('error', () => process.exit(1)); setTimeout(() => process.exit(1), 3000);\""]
+      test: ["CMD-SHELL", "wget -q -T 2 -O /dev/null http://127.0.0.1:$${PORT:-3001}/health"]
       interval: 5s
       timeout: 5s
       retries: 5
-    # T9: Migracje (Prisma + Knex) i seedy z compose, odpalane przed startem aplikacji.
-    # Kolejność: 1) Prisma migrate deploy, 2) Knex migrate latest, 3) Prisma seed, 4) Knex seed, 5) Start serwera.
+      start_period: 90s
     command: >
       sh -c "npx prisma migrate deploy
       && npx knex migrate:latest --knexfile knexfile.cjs
       && npx prisma db seed
       && npx knex seed:run --knexfile knexfile.cjs
       && npx tsx src/index.ts"
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    init: true
     cpus: 1.0
     mem_limit: 768m
     stop_grace_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
 
   mongo-service:
     image: project-p-baglaj/mongo-service:${APP_VERSION:-dev}
@@ -113,30 +188,36 @@ services:
       context: ./mongo-service
       dockerfile: Dockerfile
     environment:
+      # NODE_ENV=test w CI wylacza wymuszanie auth dla E2E.
+      NODE_ENV: ${NODE_ENV:-}
       MONGO_URI: ${MONGO_URI}
       PORT: ${MONGO_SERVICE_PORT}
+      # OAuth2 / walidacja JWT (Keycloak)
+      KEYCLOAK_JWKS_URI: ${KEYCLOAK_JWKS_URI}
+      KEYCLOAK_ALLOWED_ISSUERS: ${KEYCLOAK_ALLOWED_ISSUERS}
+      KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE}
     networks:
       - internal
     depends_on:
       mongodb:
         condition: service_healthy
-    # Seed feedu/rich-postow (paginacja kursorem) odpalany przed startem serwera.
     command: >
       sh -c "node dist/seed.js
       && node dist/index.js"
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"const http=require('http'); const port=process.env.PORT||process.env.MONGO_SERVICE_PORT||3002; const req=http.get({host:'127.0.0.1', port: port, path:'/health', timeout:2000}, res => { if (res.statusCode >= 200 && res.statusCode < 500) process.exit(0); else process.exit(1); }); req.on('error', () => process.exit(1)); setTimeout(() => process.exit(1), 3000);\""]
+      test: ["CMD-SHELL", "wget -q -T 2 -O /dev/null http://127.0.0.1:$${PORT:-3002}/health"]
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 45s
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    init: true
     cpus: 1.0
     mem_limit: 512m
     stop_grace_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
 
   api-gateway:
     image: nginx:alpine
@@ -152,13 +233,91 @@ services:
         condition: service_healthy
       mongo-service:
         condition: service_healthy
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
     cpus: 0.5
     mem_limit: 128m
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
+
+  frontend:
+    image: project-p-baglaj/frontend:${APP_VERSION:-dev}
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8080/api}
+        VITE_KEYCLOAK_AUTHORITY: ${VITE_KEYCLOAK_AUTHORITY:-http://localhost:8090/realms/SocialPolyglot}
+        VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-spa-client}
+    ports:
+      - "5173:80"
+    networks:
+      - edge
+    depends_on:
+      - api-gateway
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    cpus: 0.5
+    mem_limit: 128m
+    logging: *default-logging
+
+  ssr-client:
+    image: project-p-baglaj/ssr-client:${APP_VERSION:-dev}
+    build:
+      context: ../ssr-client
+      dockerfile: Dockerfile
+    environment:
+      PORT: "4000"
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KEYCLOAK_PUBLIC_URL: "http://localhost:${KEYCLOAK_PORT:-8090}"
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL}
+      SSR_CLIENT_ID: ${SSR_CLIENT_ID}
+      SSR_CLIENT_SECRET: ${SSR_CLIENT_SECRET}
+      SSR_SESSION_SECRET: ${SSR_SESSION_SECRET}
+      SSR_API_BASE: "http://api-gateway/api"
+      SSR_REDIRECT_URI: "http://localhost:4000/callback"
+    ports:
+      - "4000:4000"
+    networks:
+      - edge
+      - internal
+    depends_on:
+      - keycloak
+      - api-gateway
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    init: true
+    cpus: 0.5
+    mem_limit: 256m
+    logging: *default-logging
+
+  analytics-worker:
+    image: project-p-baglaj/analytics-worker:${APP_VERSION:-dev}
+    build:
+      context: ./analytics-worker
+      dockerfile: Dockerfile
+    environment:
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL}
+      B2B_CLIENT_ID: ${B2B_CLIENT_ID}
+      B2B_CLIENT_SECRET: ${B2B_CLIENT_SECRET}
+      MONGO_SERVICE_URL: "http://mongo-service:3002"
+      ANALYTICS_POLL_INTERVAL_SECONDS: ${ANALYTICS_POLL_INTERVAL_SECONDS:-60}
+    networks:
+      - internal
+    depends_on:
+      - keycloak
+      - mongo-service
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    init: true
+    cpus: 0.25
+    mem_limit: 128m
+    stop_grace_period: 10s
+    logging: *default-logging
 
   adminer:
     image: adminer:4
@@ -171,6 +330,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    security_opt:
+      - "no-new-privileges:true"
 
   mongo-express:
     image: mongo-express:1
@@ -190,6 +351,8 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
+    security_opt:
+      - "no-new-privileges:true"
 
 networks:
   edge:
@@ -202,6 +365,7 @@ volumes:
   pgdata:
   mongodata:
   redisdata:
+  keycloakdata:
 
 secrets:
   postgres_password:

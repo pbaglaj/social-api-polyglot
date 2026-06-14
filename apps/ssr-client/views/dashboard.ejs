@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Social Polyglot — SSR (dashboard)</title>
+  <style>
+    body { font-family: Segoe UI, Arial, sans-serif; margin: 0; background: #f4f6f8; color: #1f2937; }
+    header { background: #fff; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 0 rgba(0,0,0,.06); }
+    a.btn { background: #2b6cb0; color: #fff; padding: 8px 14px; border-radius: 6px; text-decoration: none; font-size: 14px; }
+    a.btn.danger { background: #b91c1c; }
+    main { max-width: 960px; margin: 0 auto; padding: 20px; }
+    .card { background: #fff; border-radius: 8px; padding: 14px; box-shadow: 0 1px 2px rgba(16,24,40,.05); margin-bottom: 16px; }
+    .chip { background: #dbeafe; color: #1e40af; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; margin-right: 4px; }
+    .feed { padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+    .meta { font-size: 12px; color: #6b7280; }
+    pre { background: #0f172a; color: #e2e8f0; padding: 10px; border-radius: 6px; overflow: auto; font-size: 12px; }
+    .err { background: #fee2e2; color: #991b1b; padding: 10px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h2>Dashboard (<%= user.username %>)</h2>
+    <div>
+      <a class="btn" href="/">Landing</a>
+      <a class="btn danger" href="/logout">Wyloguj</a>
+    </div>
+  </header>
+  <main>
+    <section class="card">
+      <h3>Tożsamość</h3>
+      <p>Role: <% user.roles.forEach(function (r) { %><span class="chip"><%= r %></span><% }); %></p>
+      <p class="meta">Dane spersonalizowane pobrane tokenem <b>użytkownika</b> (Authorization Code), nie service-accountu.</p>
+      <% if (whoami) { %><pre><%= JSON.stringify(whoami, null, 2) %></pre><% } %>
+    </section>
+    <section class="card">
+      <h3>Twój feed</h3>
+      <% if (error) { %><div class="err"><%= error %></div><% } %>
+      <% if (!feed.length) { %><p class="meta">Brak wpisów.</p><% } %>
+      <% feed.forEach(function (e) { %>
+        <div class="feed">postId: <%= e.postId %> • score: <%= e.score == null ? '-' : e.score %></div>
+      <% }); %>
+    </section>
+  </main>
+</body>
+</html>

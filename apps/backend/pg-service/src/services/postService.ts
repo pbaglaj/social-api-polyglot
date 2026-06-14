@@ -76,6 +76,31 @@ export async function createPostWithFanout(input: CreatePostInput) {
   }
 }
 
+// Edycja tresci posta - tylko wlasciciel. Ustawia editedAt (dopisek "edytowano").
+// bodyPreview zyje wylacznie w PG (RichPost w Mongo nie trzyma tresci), wiec edycja
+// nie wymaga synchronizacji miedzy bazami.
+export async function updatePostBody(postId: number, requesterId: number, bodyPreview: string) {
+  const post = await prisma.post.findUnique({
+    where: { id: postId },
+    select: { id: true, authorId: true },
+  });
+
+  if (!post) return { status: 'not_found' as const };
+  if (post.authorId !== requesterId) return { status: 'forbidden' as const };
+
+  const updated = await prisma.post.update({
+    where: { id: postId },
+    data: { bodyPreview, editedAt: new Date() },
+    include: {
+      author: { select: { username: true } },
+      _count: { select: { reactions: true } },
+    },
+  });
+
+  void invalidatePrefix('posts:list');
+  return { status: 'updated' as const, post: updated };
+}
+
 // T17: idempotentne dodawanie reakcji + fire-and-forget powiadomienie analytics.
 export async function upsertReaction(postId: number, userId: number, type: string) {
   const existing = await prisma.reaction.findUnique({
@@ -103,14 +128,15 @@ export async function upsertReaction(postId: number, userId: number, type: strin
 }
 
 // T18: usunięcie postu + kaskada w PG (transakcja) + sygnał HTTP do Mongo.
-export async function deletePostCascade(postId: number, requesterId: number) {
+export async function deletePostCascade(postId: number, requesterId: number, privileged = false) {
   const post = await prisma.post.findUnique({
     where: { id: postId },
     select: { id: true, authorId: true },
   });
 
   if (!post) return { status: 'not_found' as const };
-  if (post.authorId !== requesterId) return { status: 'forbidden' as const };
+  // Wlasciciel posta albo Admin/Moderator (kasowanie dowolnego posta).
+  if (post.authorId !== requesterId && !privileged) return { status: 'forbidden' as const };
 
   await prisma.$transaction(async (tx) => {
     await tx.comment.deleteMany({ where: { postId } });
