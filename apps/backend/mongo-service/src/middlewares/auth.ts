@@ -42,9 +42,12 @@ function extractToken(req: Request): string | null {
 }
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
+  // Decyzja o pominieciu walidacji zalezy wylacznie od ENFORCE (NODE_ENV po
+  // stronie serwera), nigdy od danych z requestu. Sprawdzamy ja przed odczytem
+  // tokenu, zeby dane kontrolowane przez uzytkownika nie sterowaly bypassem.
+  if (!ENFORCE) return next();
   const token = extractToken(req);
   if (!token) {
-    if (!ENFORCE) return next();
     return res.status(401).json({ error: 'Unauthorized', code: 'NO_TOKEN', details: 'Brak naglowka Authorization: Bearer <token>.' });
   }
   try {
@@ -57,7 +60,6 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     req.roles = (payload as AuthPayload).realm_access?.roles ?? [];
     return next();
   } catch {
-    if (!ENFORCE) return next();
     return res.status(401).json({ error: 'Unauthorized', code: 'INVALID_TOKEN', details: 'Weryfikacja tokenu nie powiodla sie.' });
   }
 }
