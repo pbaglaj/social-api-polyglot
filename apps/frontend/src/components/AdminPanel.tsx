@@ -74,6 +74,41 @@ export function AdminPanel() {
     }
   }
 
+  // Odzyskiwanie hasla (recovery) - deleguje do Keycloak: mail z linkiem resetu albo
+  // wymagana akcja UPDATE_PASSWORD (gdy brak SMTP). Backend zwraca uzyty wariant.
+  async function recoverPassword(id: string, username?: string) {
+    if (!window.confirm(`Send password recovery for ${username ?? id}?`)) return;
+    try {
+      const res = await request<{ method?: string }>(`/admin/users/${id}/recover-password`, { method: 'POST' });
+      const via = res?.method === 'email' ? 'reset email sent' : 'required action set (UPDATE_PASSWORD at next login)';
+      setStatus(`Password recovery: ${via}.`);
+    } catch (e) {
+      setStatus('Recovery error: ' + (e as Error).message);
+    }
+  }
+
+  // Wlaczenie 2FA/MFA (TOTP) - wymusza konfiguracje authenticatora przy logowaniu.
+  async function enableMfa(id: string, username?: string) {
+    if (!window.confirm(`Enable 2FA (TOTP) for ${username ?? id}?`)) return;
+    try {
+      const res = await request<{ emailed?: boolean }>(`/admin/users/${id}/mfa`, { method: 'POST' });
+      setStatus(`2FA enabled: CONFIGURE_TOTP required at next login${res?.emailed ? ' (+ email sent)' : ''}.`);
+    } catch (e) {
+      setStatus('Enable 2FA error: ' + (e as Error).message);
+    }
+  }
+
+  // Wylaczenie 2FA/MFA - usuwa skonfigurowane czynniki TOTP.
+  async function disableMfa(id: string, username?: string) {
+    if (!window.confirm(`Disable 2FA (TOTP) for ${username ?? id}?`)) return;
+    try {
+      const res = await request<{ removedFactors?: number }>(`/admin/users/${id}/mfa`, { method: 'DELETE' });
+      setStatus(`2FA disabled (removed ${res?.removedFactors ?? 0} factor(s)).`);
+    } catch (e) {
+      setStatus('Disable 2FA error: ' + (e as Error).message);
+    }
+  }
+
   function toggleRole(role: string) {
     setCu((prev) => ({
       ...prev,
@@ -131,6 +166,11 @@ export function AdminPanel() {
                 </span>
               ))}
               <button onClick={() => void resetPassword(u.id)}>Reset password</button>
+              <button onClick={() => void recoverPassword(u.id, u.username)}>Recover password</button>
+              <button onClick={() => void enableMfa(u.id, u.username)}>Enable 2FA</button>
+              <button className="danger" onClick={() => void disableMfa(u.id, u.username)}>
+                Disable 2FA
+              </button>
             </div>
           </li>
         ))}
