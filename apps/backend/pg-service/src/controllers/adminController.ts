@@ -88,6 +88,66 @@ export async function resetUserPassword(req: Request, res: Response, next: NextF
   }
 }
 
+// Odzyskiwanie hasla: deleguje do Keycloak. Preferuje maila z linkiem resetu
+// (execute-actions-email UPDATE_PASSWORD); gdy realm nie ma SMTP, ustawia wymaganaa
+// akcje UPDATE_PASSWORD - user zmieni haslo przy najblizszym logowaniu (bez maila).
+export async function recoverPassword(req: Request, res: Response, next: NextFunction) {
+  const userId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  if (!userId) {
+    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_USER_ID', details: 'Podaj userId.' });
+  }
+  try {
+    await kc.sendExecuteActionsEmail(userId, ['UPDATE_PASSWORD']);
+    return res.json({ success: true, userId, method: 'email', action: 'UPDATE_PASSWORD' });
+  } catch {
+    // brak SMTP / mail nie wyszedl - fallback na wymaganaa akcje (dziala zawsze)
+    try {
+      await kc.addRequiredActions(userId, ['UPDATE_PASSWORD']);
+      return res.json({ success: true, userId, method: 'required_action', action: 'UPDATE_PASSWORD' });
+    } catch (err) {
+      return next(err);
+    }
+  }
+}
+
+// Wlaczenie 2FA/MFA (TOTP): wymusza konfiguracje aplikacji authenticatora przy
+// najblizszym logowaniu (wymagana akcja CONFIGURE_TOTP) i probuje wyslac maila.
+export async function enableMfa(req: Request, res: Response, next: NextFunction) {
+  const userId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  if (!userId) {
+    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_USER_ID', details: 'Podaj userId.' });
+  }
+  try {
+    await kc.addRequiredActions(userId, ['CONFIGURE_TOTP']);
+    // mail to dodatek - brak SMTP nie moze wywrocic operacji
+    let emailed = false;
+    try {
+      await kc.sendExecuteActionsEmail(userId, ['CONFIGURE_TOTP']);
+      emailed = true;
+    } catch {
+      /* SMTP nieskonfigurowany - akcja i tak wymuszona przy logowaniu */
+    }
+    res.json({ success: true, userId, action: 'CONFIGURE_TOTP', emailed });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Wylaczenie 2FA/MFA: usuwa skonfigurowane czynniki TOTP i sciaga wymaganaa akcje.
+export async function disableMfa(req: Request, res: Response, next: NextFunction) {
+  const userId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  if (!userId) {
+    return res.status(400).json({ error: 'Validation Error', code: 'INVALID_USER_ID', details: 'Podaj userId.' });
+  }
+  try {
+    const removed = await kc.deleteOtpCredentials(userId);
+    await kc.removeRequiredActions(userId, ['CONFIGURE_TOTP']);
+    res.json({ success: true, userId, removedFactors: removed });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // Zwraca tozsamosc zalogowanego uzytkownika (z tokenu + lokalny profil).
 export function whoami(req: Request, res: Response) {
   res.json({

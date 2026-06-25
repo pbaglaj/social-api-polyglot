@@ -6,6 +6,9 @@ import {
   assignRoles,
   revokeRoles,
   resetUserPassword,
+  recoverPassword,
+  enableMfa,
+  disableMfa,
   whoami,
 } from '../controllers/adminController.js';
 
@@ -22,5 +25,10 @@ router.post('/users', createKcUser);
 router.post('/users/:id/roles', assignRoles);
 router.delete('/users/:id/roles', revokeRoles);
 router.put('/users/:id/password', resetUserPassword);
+// Odzyskiwanie hasla (recovery) - mail z linkiem resetu lub wymagana akcja UPDATE_PASSWORD.
+router.post('/users/:id/recover-password', recoverPassword);
+// 2FA/MFA (TOTP) - wlaczenie (wymuszenie konfiguracji) / wylaczenie.
+router.post('/users/:id/mfa', enableMfa);
+router.delete('/users/:id/mfa', disableMfa);
 
 export default router;

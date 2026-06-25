@@ -127,3 +127,80 @@ export async function resetPassword(userId: string, password: string, temporary 
     throw new Error(`Keycloak resetPassword ${res.status}: ${await res.text()}`);
   }
 }
+
+interface KcUser {
+  id: string;
+  username: string;
+  email?: string;
+  requiredActions?: string[];
+}
+
+export async function getUser(userId: string): Promise<KcUser> {
+  const res = await kcFetch(`/users/${userId}`);
+  if (!res.ok) throw new Error(`Keycloak getUser ${res.status}: ${await res.text()}`);
+  return res.json() as Promise<KcUser>;
+}
+
+// Dopisuje wymagane akcje (UPDATE_PASSWORD, CONFIGURE_TOTP, ...) do konta - uzytkownik
+// musi je wykonac przy najblizszym logowaniu. Dziala bez SMTP, w przeciwienstwie do maili.
+export async function addRequiredActions(userId: string, actions: string[]): Promise<void> {
+  const user = await getUser(userId);
+  const merged = Array.from(new Set([...(user.requiredActions ?? []), ...actions]));
+  const res = await kcFetch(`/users/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ requiredActions: merged }),
+  });
+  if (!res.ok && res.status !== 204) {
+    throw new Error(`Keycloak addRequiredActions ${res.status}: ${await res.text()}`);
+  }
+}
+
+export async function removeRequiredActions(userId: string, actions: string[]): Promise<void> {
+  const user = await getUser(userId);
+  const remaining = (user.requiredActions ?? []).filter((a) => !actions.includes(a));
+  const res = await kcFetch(`/users/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ requiredActions: remaining }),
+  });
+  if (!res.ok && res.status !== 204) {
+    throw new Error(`Keycloak removeRequiredActions ${res.status}: ${await res.text()}`);
+  }
+}
+
+// Wysyla maila z linkiem do wykonania akcji (UPDATE_PASSWORD = odzyskiwanie hasla,
+// CONFIGURE_TOTP = konfiguracja 2FA). Wymaga skonfigurowanego SMTP w realmie -
+// w przeciwnym razie Keycloak zwraca blad i nalezy uzyc addRequiredActions().
+export async function sendExecuteActionsEmail(userId: string, actions: string[]): Promise<void> {
+  const res = await kcFetch(`/users/${userId}/execute-actions-email`, {
+    method: 'PUT',
+    body: JSON.stringify(actions),
+  });
+  if (!res.ok && res.status !== 204) {
+    throw new Error(`Keycloak executeActionsEmail ${res.status}: ${await res.text()}`);
+  }
+}
+
+interface KcCredential {
+  id: string;
+  type: string;
+}
+
+export async function listCredentials(userId: string): Promise<KcCredential[]> {
+  const res = await kcFetch(`/users/${userId}/credentials`);
+  if (!res.ok) throw new Error(`Keycloak listCredentials ${res.status}: ${await res.text()}`);
+  return res.json() as Promise<KcCredential[]>;
+}
+
+// Usuwa wszystkie skonfigurowane czynniki TOTP/OTP - wylacza 2FA dla konta.
+// Zwraca liczbe usunietych poswiadczen.
+export async function deleteOtpCredentials(userId: string): Promise<number> {
+  const creds = await listCredentials(userId);
+  const otp = creds.filter((c) => c.type === 'otp');
+  for (const c of otp) {
+    const res = await kcFetch(`/users/${userId}/credentials/${c.id}`, { method: 'DELETE' });
+    if (!res.ok && res.status !== 204) {
+      throw new Error(`Keycloak deleteCredential ${res.status}: ${await res.text()}`);
+    }
+  }
+  return otp.length;
+}
