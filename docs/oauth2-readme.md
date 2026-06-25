@@ -98,8 +98,22 @@ Middleware `src/middlewares/auth.ts` w obu serwisach (biblioteka **`jose`**):
 ## Zarządzanie użytkownikami przez backend (Admin REST API)
 
 `pg-service` deleguje operacje do **Keycloak Admin REST API** klientem `backend-admin` (Client
-Credentials). Endpointy `/api/admin/users*`: lista, zakładanie konta z rolami, nadawanie/odbieranie ról,
-reset hasła. Rejestracja, reset hasła i **MFA/TOTP** są włączone w realmie i obsługiwane na natywnych ekranach Keycloak.
+Credentials). Komponent API sam waliduje tokeny klientów (JWKS, `jose`) — wszystkie endpointy poniżej
+wymagają roli `Admin`.
+
+| Funkcja | Endpoint | Delegacja do Keycloak |
+|---------|----------|-----------------------|
+| Lista userów | `GET /api/admin/users` | `GET /users` |
+| **Zakładanie konta + rola** | `POST /api/admin/users` (`roles[]`) | `POST /users` + `role-mappings/realm` |
+| Nadanie/odebranie roli | `POST`/`DELETE /api/admin/users/:id/roles` | `role-mappings/realm` |
+| Reset hasła (admin ustawia) | `PUT /api/admin/users/:id/password` | `PUT /users/:id/reset-password` |
+| **Odzyskiwanie hasła (recovery)** | `POST /api/admin/users/:id/recover-password` | `execute-actions-email [UPDATE_PASSWORD]`, a bez SMTP fallback na `requiredActions` |
+| **Włączenie 2FA/MFA (TOTP)** | `POST /api/admin/users/:id/mfa` | `requiredActions [CONFIGURE_TOTP]` (+ mail jeśli SMTP) |
+| Wyłączenie 2FA/MFA | `DELETE /api/admin/users/:id/mfa` | usuwa poświadczenia `otp` + zdejmuje `requiredActions` |
+
+`recover-password` i `mfa` działają **bez skonfigurowanego SMTP** — wymuszają akcję (`UPDATE_PASSWORD` /
+`CONFIGURE_TOTP`) przy najbliższym logowaniu na natywnym ekranie Keycloak; gdy SMTP jest ustawiony,
+dodatkowo wychodzi mail z linkiem. Polityka TOTP (`otpPolicyType: totp`) jest zdefiniowana w realmie.
 
 ## Faza 4 — Google Identity Brokering + Calendar (działa, zweryfikowane E2E)
 
@@ -165,8 +179,9 @@ docker compose ps                    # ~40 s na Keycloak
 4. **Client #1 SPA (PKCE) + RBAC:** `:5173` → login `user/user` (w DevTools pokaż wymianę `code`→token bez
    `client_secret`) → CRUD (post, reakcja, komentarz, follow, feed, statystyki). Wyloguj, `admin/admin` → pojawia się Admin panel + tworzenie tagów.
 5. **Zarządzanie userami przez AS:** panel Admina SPA (lub curl tokenem admina) → `POST /api/admin/users`,
-   `POST/DELETE /api/admin/users/:id/roles`, `PUT /api/admin/users/:id/password` (delegacja do Keycloak Admin API).
-   Reset hasła i MFA/TOTP na natywnych ekranach Keycloak.
+   `POST/DELETE /api/admin/users/:id/roles`, `PUT /api/admin/users/:id/password`,
+   `POST /api/admin/users/:id/recover-password` (odzyskiwanie hasła),
+   `POST` / `DELETE /api/admin/users/:id/mfa` (włącz/wyłącz 2FA-TOTP) — wszystko delegowane do Keycloak Admin API.
 6. **Client #2 SSR (confidential):** `:4000` → landing (token SA) → `/login` → `/dashboard` (token usera).
    Pointa: tokeny w sesji serwera, wymiana `code`→token back-channel z sekretem.
 7. **Wyższa ocena — Google:** w SPA zaloguj się **przez Google** (Identity Brokering) → panel „Google Calendar" →
@@ -210,7 +225,7 @@ cd apps/backend/mongo-service && npm test
 | Resource Server (CRUD API) | ✅ | `/api/posts,users,tags,feed,…` przez gateway `:8080` |
 | ≥ 2 role | ✅ **4 role** (Admin, User, Moderator, analytics) | realm-export.json; `requireRole(...)` |
 | API waliduje tokeny (klucze serwera) | ✅ JWKS (`jose`) | `*/src/middlewares/auth.ts` |
-| Zarządzanie userami przez AS (+ rola, reset, MFA) | ✅ | backend → Keycloak Admin API + ekrany Keycloak (TOTP) |
+| Zarządzanie userami przez AS (+ rola, reset, MFA) | ✅ | backend → Keycloak Admin API: `POST /api/admin/users`, `…/roles`, `…/password`, `…/recover-password`, `…/mfa` |
 | Client #1 SPA (wszystkie endpointy) | ✅ React+Vite, PKCE | `apps/frontend/` |
 | Client #2 SSR (wybrane endpointy) | ✅ Express+EJS, confidential | `apps/ssr-client/` |
 | Client #3 B2B/M2M (wybrane endpointy) | ✅ Client Credentials | `apps/backend/analytics-worker/` |
