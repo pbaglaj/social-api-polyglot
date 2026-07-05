@@ -7,10 +7,15 @@ interface TopbarProps {
   onLogout: () => void;
 }
 
+// Znaczace role aplikacji — domyslne role Keycloak (offline_access,
+// uma_authorization, default-roles-*) sa pomijane w naglowku.
+const APP_ROLES = ['Admin', 'Moderator', 'User', 'analytics'];
+
 // Gorny pasek: logo (-> Home), role usera, awatar (-> wlasny profil), wyloguj.
 export function Topbar({ username, roles, appUserId, onLogout }: TopbarProps) {
   const { goto, openProfile } = useNav();
   const initial = (username?.[0] ?? '?').toUpperCase();
+  const shownRoles = roles.filter((r) => APP_ROLES.includes(r));
 
   return (
     <header className="topbar">
@@ -22,8 +27,8 @@ export function Topbar({ username, roles, appUserId, onLogout }: TopbarProps) {
 
         <div className="topbar-right">
           <span className="roles">
-            {roles.length ? (
-              roles.map((r) => (
+            {shownRoles.length ? (
+              shownRoles.map((r) => (
                 <span key={r} className={`chip chip-${r.toLowerCase()}`}>
                   {r}
                 </span>
